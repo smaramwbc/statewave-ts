@@ -10,6 +10,31 @@ import type {
   Timeline,
 } from "./types.js";
 
+/** Structured error from the Statewave API. */
+export class StatewaveAPIError extends Error {
+  readonly statusCode: number;
+  readonly code: string;
+  readonly details?: unknown;
+  readonly requestId?: string;
+
+  constructor(statusCode: number, code: string, message: string, details?: unknown, requestId?: string) {
+    super(`[${statusCode}] ${code}: ${message}`);
+    this.name = "StatewaveAPIError";
+    this.statusCode = statusCode;
+    this.code = code;
+    this.details = details;
+    this.requestId = requestId;
+  }
+}
+
+/** Raised when the SDK cannot reach the Statewave server. */
+export class StatewaveConnectionError extends Error {
+  constructor(message = "Cannot connect to Statewave server") {
+    super(message);
+    this.name = "StatewaveConnectionError";
+  }
+}
+
 export class StatewaveClient {
   private baseUrl: string;
 
@@ -67,14 +92,40 @@ export class StatewaveClient {
   }
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const resp = await fetch(`${this.baseUrl}${path}`, {
-      method,
-      headers: body ? { "Content-Type": "application/json" } : {},
-      body: body ? JSON.stringify(body) : undefined,
-    });
+    let resp: Response;
+    try {
+      resp = await fetch(`${this.baseUrl}${path}`, {
+        method,
+        headers: body ? { "Content-Type": "application/json" } : {},
+        body: body ? JSON.stringify(body) : undefined,
+      });
+    } catch (err) {
+      throw new StatewaveConnectionError(
+        err instanceof Error ? err.message : "Cannot connect to Statewave server"
+      );
+    }
     if (!resp.ok) {
-      throw new Error(`Statewave API error: ${resp.status} ${resp.statusText}`);
+      await this.handleErrorResponse(resp);
     }
     return resp.json() as Promise<T>;
+  }
+
+  private async handleErrorResponse(resp: Response): Promise<never> {
+    try {
+      const body = await resp.json();
+      const err = body?.error;
+      if (err && typeof err.code === "string") {
+        throw new StatewaveAPIError(
+          resp.status,
+          err.code,
+          err.message ?? resp.statusText,
+          err.details,
+          err.request_id,
+        );
+      }
+    } catch (e) {
+      if (e instanceof StatewaveAPIError) throw e;
+    }
+    throw new StatewaveAPIError(resp.status, "unknown", resp.statusText);
   }
 }
