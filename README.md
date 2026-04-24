@@ -1,6 +1,6 @@
 # statewave-ts
 
-Official TypeScript SDK for [Statewave](https://github.com/smaramwbc/statewave) — Memory OS for AI agents.
+Official TypeScript SDK for [Statewave](https://github.com/smaramwbc/statewave) — memory runtime for AI agents and applications.
 
 ## Install
 
@@ -48,6 +48,12 @@ const ctx = await sw.getContext({
 });
 console.log(ctx.assembled_context);
 
+// Batch ingestion (up to 100)
+await sw.createEpisodesBatch([
+  { subject_id: "user-42", source: "crm", type: "note", payload: { text: "Prefers email" } },
+  { subject_id: "user-42", source: "crm", type: "note", payload: { text: "Enterprise plan" } },
+]);
+
 // Search memories
 const facts = await sw.searchMemories({
   subject_id: "user-42",
@@ -60,6 +66,12 @@ const results = await sw.searchMemories({
   query: "billing",
   semantic: true,
 });
+
+// List all known subjects
+const subjects = await sw.listSubjects();
+for (const s of subjects.subjects) {
+  console.log(`${s.subject_id}: ${s.episode_count} episodes, ${s.memory_count} memories`);
+}
 
 // Get timeline
 const timeline = await sw.getTimeline("user-42");
@@ -99,6 +111,9 @@ All response types are fully typed:
 - `ContextBundle` — assembled context with facts, episodes, provenance
 - `Timeline` — chronological subject history
 - `DeleteResult` — deletion confirmation
+- `BatchCreateResult` — batch ingestion response
+- `SubjectSummary` — subject with episode/memory counts
+- `ListSubjectsResult` — paginated subject listing
 
 Param types: `CreateEpisodeParams`, `SearchMemoriesParams`, `GetContextParams`
 
