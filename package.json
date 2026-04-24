@@ -1,0 +1,17 @@
+{
+  "name": "statewave-ts",
+  "version": "0.1.0",
+  "description": "Official TypeScript SDK for Statewave",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "license": "Apache-2.0",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.4",
+    "vitest": "^1.6"
+  }
+}
