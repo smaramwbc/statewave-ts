@@ -7,6 +7,7 @@ import type {
   DeleteResult,
   Episode,
   GetContextParams,
+  ListSubjectsResult,
   SearchMemoriesParams,
   SearchResult,
   Timeline,
@@ -98,6 +99,14 @@ export class StatewaveClient {
 
   async deleteSubject(subjectId: string): Promise<DeleteResult> {
     return this.request("DELETE", `/v1/subjects/${encodeURIComponent(subjectId)}`);
+  }
+
+  async listSubjects(params?: { limit?: number; offset?: number }): Promise<ListSubjectsResult> {
+    const qs = new URLSearchParams();
+    if (params?.limit !== undefined) qs.set("limit", String(params.limit));
+    if (params?.offset !== undefined) qs.set("offset", String(params.offset));
+    const query = qs.toString();
+    return this.get(`/v1/subjects${query ? `?${query}` : ""}`);
   }
 
   // ------------------------------------------------------------------

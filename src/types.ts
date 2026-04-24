@@ -65,6 +65,17 @@ export interface BatchCreateResult {
   episodes: Episode[];
 }
 
+export interface SubjectSummary {
+  subject_id: string;
+  episode_count: number;
+  memory_count: number;
+}
+
+export interface ListSubjectsResult {
+  subjects: SubjectSummary[];
+  total: number;
+}
+
 export interface CreateEpisodeParams {
   subject_id: string;
   source: string;
