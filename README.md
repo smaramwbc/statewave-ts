@@ -1,6 +1,6 @@
 # statewave-ts
 
-Official TypeScript SDK for [Statewave](https://github.com/statewave/statewave) — Memory OS for AI agents.
+Official TypeScript SDK for [Statewave](https://github.com/smaramwbc/statewave) — Memory OS for AI agents.
 
 ## Install
 
