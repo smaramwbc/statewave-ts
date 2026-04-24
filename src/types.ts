@@ -60,6 +60,11 @@ export interface DeleteResult {
   memories_deleted: number;
 }
 
+export interface BatchCreateResult {
+  episodes_created: number;
+  episodes: Episode[];
+}
+
 export interface CreateEpisodeParams {
   subject_id: string;
   source: string;
@@ -73,6 +78,7 @@ export interface SearchMemoriesParams {
   subject_id: string;
   kind?: string;
   query?: string;
+  semantic?: boolean;
   limit?: number;
 }
 
@@ -80,4 +86,10 @@ export interface GetContextParams {
   subject_id: string;
   task: string;
   max_tokens?: number;
+}
+
+export interface ClientOptions {
+  baseUrl?: string;
+  apiKey?: string;
+  tenantId?: string;
 }

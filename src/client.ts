@@ -1,4 +1,6 @@
 import type {
+  BatchCreateResult,
+  ClientOptions,
   CompileResult,
   ContextBundle,
   CreateEpisodeParams,
@@ -37,9 +39,14 @@ export class StatewaveConnectionError extends Error {
 
 export class StatewaveClient {
   private baseUrl: string;
+  private defaultHeaders: Record<string, string>;
 
-  constructor(baseUrl = "http://localhost:8100") {
-    this.baseUrl = baseUrl.replace(/\/+$/, "");
+  constructor(options: ClientOptions | string = "http://localhost:8100") {
+    const opts = typeof options === "string" ? { baseUrl: options } : options;
+    this.baseUrl = (opts.baseUrl ?? "http://localhost:8100").replace(/\/+$/, "");
+    this.defaultHeaders = {};
+    if (opts.apiKey) this.defaultHeaders["X-API-Key"] = opts.apiKey;
+    if (opts.tenantId) this.defaultHeaders["X-Tenant-ID"] = opts.tenantId;
   }
 
   async createEpisode(params: CreateEpisodeParams): Promise<Episode> {
@@ -53,6 +60,17 @@ export class StatewaveClient {
     });
   }
 
+  async createEpisodesBatch(episodes: CreateEpisodeParams[]): Promise<BatchCreateResult> {
+    return this.post("/v1/episodes/batch", { episodes: episodes.map(e => ({
+      subject_id: e.subject_id,
+      source: e.source,
+      type: e.type,
+      payload: e.payload,
+      metadata: e.metadata ?? {},
+      provenance: e.provenance ?? {},
+    }))});
+  }
+
   async compileMemories(subjectId: string): Promise<CompileResult> {
     return this.post("/v1/memories/compile", { subject_id: subjectId });
   }
@@ -61,6 +79,7 @@ export class StatewaveClient {
     const qs = new URLSearchParams({ subject_id: params.subject_id });
     if (params.kind) qs.set("kind", params.kind);
     if (params.query) qs.set("q", params.query);
+    if (params.semantic) qs.set("semantic", "true");
     if (params.limit !== undefined) qs.set("limit", String(params.limit));
     return this.get(`/v1/memories/search?${qs}`);
   }
@@ -94,9 +113,11 @@ export class StatewaveClient {
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
     let resp: Response;
     try {
+      const headers: Record<string, string> = { ...this.defaultHeaders };
+      if (body) headers["Content-Type"] = "application/json";
       resp = await fetch(`${this.baseUrl}${path}`, {
         method,
-        headers: body ? { "Content-Type": "application/json" } : {},
+        headers,
         body: body ? JSON.stringify(body) : undefined,
       });
     } catch (err) {
