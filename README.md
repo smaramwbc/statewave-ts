@@ -13,7 +13,15 @@ npm install statewave-ts
 ```typescript
 import { StatewaveClient } from "statewave-ts";
 
+// Basic (no auth)
 const sw = new StatewaveClient("http://localhost:8100");
+
+// With authentication and tenant
+const swAuth = new StatewaveClient({
+  baseUrl: "http://localhost:8100",
+  apiKey: "your-key",
+  tenantId: "acme",
+});
 
 // Record an episode
 await sw.createEpisode({
@@ -44,6 +52,13 @@ console.log(ctx.assembled_context);
 const facts = await sw.searchMemories({
   subject_id: "user-42",
   kind: "profile_fact",
+});
+
+// Semantic search (requires embeddings)
+const results = await sw.searchMemories({
+  subject_id: "user-42",
+  query: "billing",
+  semantic: true,
 });
 
 // Get timeline

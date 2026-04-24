@@ -1,13 +1,34 @@
 {
   "name": "statewave-ts",
-  "version": "0.2.0",
-  "description": "Official TypeScript SDK for Statewave",
+  "version": "0.4.0",
+  "description": "Official TypeScript SDK for Statewave — Memory OS for AI agents",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md", "LICENSE"],
   "license": "Apache-2.0",
+  "author": "Statewave <hello@statewave.dev>",
+  "keywords": ["statewave", "ai", "agents", "memory", "context", "sdk", "typescript"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/smaramwbc/statewave-ts.git"
+  },
+  "bugs": {
+    "url": "https://github.com/smaramwbc/statewave-ts/issues"
+  },
+  "homepage": "https://github.com/smaramwbc/statewave-ts#readme",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "tsc",
+    "prepublishOnly": "tsc",
     "test": "vitest run"
   },
   "devDependencies": {
