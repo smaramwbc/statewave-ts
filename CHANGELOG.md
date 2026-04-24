@@ -1,6 +1,13 @@
 # Changelog
 
-## 0.3.5 (2025-01-XX)
+## 0.4.0 (2026-04-24)
+
+- Batch episode ingestion (`createEpisodesBatch()`)
+- Subject listing (`listSubjects()`)
+- `BatchCreateResult`, `SubjectSummary`, `ListSubjectsResult` types
+- npm-ready metadata (exports, files, engines, repository)
+
+## 0.3.5 (2026-04-24)
 
 - Auth support (`apiKey` constructor option)
 - Multi-tenant support (`tenantId` constructor option)
