@@ -1,5 +1,9 @@
 # statewave-ts
 
+[![CI](https://github.com/smaramwbc/statewave-ts/actions/workflows/ci.yml/badge.svg)](https://github.com/smaramwbc/statewave-ts/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/statewave-ts)](https://www.npmjs.com/package/statewave-ts)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
 Official TypeScript SDK for [Statewave](https://github.com/smaramwbc/statewave) — memory runtime for AI agents and applications.
 
 ## Install
