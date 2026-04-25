@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.3 (2026-04-25)
+
+- README updated with batch and subject listing examples
+- Automated release workflow (tag-push trigger, CI gate, npm publish with provenance)
+- PUBLISHING.md rewritten for automated process
+- CI now runs tests (vitest)
+
 ## 0.4.0 (2026-04-24)
 
 - Batch episode ingestion (`createEpisodesBatch()`)
