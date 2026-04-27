@@ -16,6 +16,11 @@ describe("StatewaveClient", () => {
     const client = new StatewaveClient("http://localhost:8100///");
     expect(client).toBeDefined();
   });
+
+  it("has getContextString method", () => {
+    const client = new StatewaveClient();
+    expect(typeof client.getContextString).toBe("function");
+  });
 });
 
 describe("StatewaveAPIError", () => {

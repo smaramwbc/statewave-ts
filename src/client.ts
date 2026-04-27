@@ -93,6 +93,12 @@ export class StatewaveClient {
     });
   }
 
+  /** Return just the assembled context string, ready to inject into a prompt. */
+  async getContextString(params: GetContextParams): Promise<string> {
+    const bundle = await this.getContext(params);
+    return bundle.assembled_context;
+  }
+
   async getTimeline(subjectId: string): Promise<Timeline> {
     return this.get(`/v1/timeline?subject_id=${encodeURIComponent(subjectId)}`);
   }
