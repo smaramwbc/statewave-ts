@@ -1,6 +1,6 @@
 # statewave-ts
 
-[![CI](https://github.com/smaramwbc/statewave-ts/actions/workflows/ci.yml/badge.svg)](https://github.com/smaramwbc/statewave-ts/actions/workflows/ci.yml)
+[![CI](https://github.com/smaramwbc/statewave-ts/workflows/CI/badge.svg)](https://github.com/smaramwbc/statewave-ts/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/statewave-ts)](https://www.npmjs.com/package/statewave-ts)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
