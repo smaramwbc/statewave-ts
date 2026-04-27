@@ -103,4 +103,20 @@ export interface ClientOptions {
   baseUrl?: string;
   apiKey?: string;
   tenantId?: string;
+  /** Retry configuration. Set to false to disable retries. */
+  retry?: RetryConfig | false;
+}
+
+/** Configuration for automatic retry on transient failures. */
+export interface RetryConfig {
+  /** Maximum number of retry attempts (default: 3). */
+  maxRetries?: number;
+  /** Base delay in ms for exponential backoff (default: 500). */
+  backoffBase?: number;
+  /** Maximum delay cap in ms (default: 30000). */
+  backoffMax?: number;
+  /** Whether to add random jitter (default: true). */
+  jitter?: boolean;
+  /** HTTP status codes that trigger a retry (default: [429, 500, 502, 503, 504]). */
+  retryOnStatus?: number[];
 }
