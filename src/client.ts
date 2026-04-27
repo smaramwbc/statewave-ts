@@ -8,6 +8,7 @@ import type {
   Episode,
   GetContextParams,
   ListSubjectsResult,
+  RetryConfig,
   SearchMemoriesParams,
   SearchResult,
   Timeline,
@@ -41,6 +42,7 @@ export class StatewaveConnectionError extends Error {
 export class StatewaveClient {
   private baseUrl: string;
   private defaultHeaders: Record<string, string>;
+  private retryConfig: Required<RetryConfig>;
 
   constructor(options: ClientOptions | string = "http://localhost:8100") {
     const opts = typeof options === "string" ? { baseUrl: options } : options;
@@ -48,6 +50,15 @@ export class StatewaveClient {
     this.defaultHeaders = {};
     if (opts.apiKey) this.defaultHeaders["X-API-Key"] = opts.apiKey;
     if (opts.tenantId) this.defaultHeaders["X-Tenant-ID"] = opts.tenantId;
+
+    const retry = opts.retry === false ? { maxRetries: 0 } : (opts.retry ?? {});
+    this.retryConfig = {
+      maxRetries: retry.maxRetries ?? 3,
+      backoffBase: retry.backoffBase ?? 500,
+      backoffMax: retry.backoffMax ?? 30_000,
+      jitter: retry.jitter ?? true,
+      retryOnStatus: retry.retryOnStatus ?? [429, 500, 502, 503, 504],
+    };
   }
 
   async createEpisode(params: CreateEpisodeParams): Promise<Episode> {
@@ -126,24 +137,67 @@ export class StatewaveClient {
   }
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    let resp: Response;
-    try {
-      const headers: Record<string, string> = { ...this.defaultHeaders };
-      if (body) headers["Content-Type"] = "application/json";
-      resp = await fetch(`${this.baseUrl}${path}`, {
-        method,
-        headers,
-        body: body ? JSON.stringify(body) : undefined,
-      });
-    } catch (err) {
-      throw new StatewaveConnectionError(
-        err instanceof Error ? err.message : "Cannot connect to Statewave server"
-      );
-    }
-    if (!resp.ok) {
+    let lastError: Error | undefined;
+
+    for (let attempt = 0; attempt <= this.retryConfig.maxRetries; attempt++) {
+      let resp: Response;
+      try {
+        const headers: Record<string, string> = { ...this.defaultHeaders };
+        if (body) headers["Content-Type"] = "application/json";
+        resp = await fetch(`${this.baseUrl}${path}`, {
+          method,
+          headers,
+          body: body ? JSON.stringify(body) : undefined,
+        });
+      } catch (err) {
+        // Network/connection error — retryable
+        lastError = err instanceof Error ? err : new Error(String(err));
+        if (attempt < this.retryConfig.maxRetries) {
+          await this.sleep(this.delayForAttempt(attempt));
+          continue;
+        }
+        throw new StatewaveConnectionError(lastError.message);
+      }
+
+      if (resp.ok) {
+        return resp.json() as Promise<T>;
+      }
+
+      // Check if retryable status
+      if (this.retryConfig.retryOnStatus.includes(resp.status) && attempt < this.retryConfig.maxRetries) {
+        const retryAfter = this.parseRetryAfter(resp);
+        await this.sleep(this.delayForAttempt(attempt, retryAfter));
+        continue;
+      }
+
       await this.handleErrorResponse(resp);
     }
-    return resp.json() as Promise<T>;
+
+    // Should not reach here
+    throw new StatewaveConnectionError(lastError?.message ?? "Retry attempts exhausted");
+  }
+
+  private delayForAttempt(attempt: number, retryAfterMs?: number): number {
+    if (retryAfterMs !== undefined) {
+      return Math.min(retryAfterMs, this.retryConfig.backoffMax);
+    }
+    let delay = this.retryConfig.backoffBase * (2 ** attempt);
+    delay = Math.min(delay, this.retryConfig.backoffMax);
+    if (this.retryConfig.jitter) {
+      delay *= 0.5 + Math.random();
+    }
+    return delay;
+  }
+
+  private parseRetryAfter(resp: Response): number | undefined {
+    const value = resp.headers.get("retry-after");
+    if (!value) return undefined;
+    const seconds = parseFloat(value);
+    return isNaN(seconds) ? undefined : seconds * 1000;
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   private async handleErrorResponse(resp: Response): Promise<never> {
