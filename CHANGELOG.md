@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0 (2026-04-28)
+
+- Async compile support: `compileMemoriesAsync()`, `getCompileStatus()`, `compileMemoriesWait()`
+- `CompileJob` type
+- SDK retry with exponential backoff on 429/5xx
+
 ## 0.4.3 (2026-04-25)
 
 - README updated with batch and subject listing examples
