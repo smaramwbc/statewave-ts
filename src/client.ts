@@ -1,6 +1,7 @@
 import type {
   BatchCreateResult,
   ClientOptions,
+  CompileJob,
   CompileResult,
   ContextBundle,
   CreateEpisodeParams,
@@ -85,6 +86,36 @@ export class StatewaveClient {
 
   async compileMemories(subjectId: string): Promise<CompileResult> {
     return this.post("/v1/memories/compile", { subject_id: subjectId });
+  }
+
+  /** Submit async compilation — returns immediately with a job_id. */
+  async compileMemoriesAsync(subjectId: string): Promise<CompileJob> {
+    return this.post("/v1/memories/compile", { subject_id: subjectId, async: true });
+  }
+
+  /** Poll the status of an async compile job. */
+  async getCompileStatus(jobId: string): Promise<CompileJob> {
+    return this.get(`/v1/memories/compile/${encodeURIComponent(jobId)}`);
+  }
+
+  /** Submit async compilation and poll until terminal state or timeout. */
+  async compileMemoriesWait(
+    subjectId: string,
+    options?: { pollInterval?: number; timeout?: number }
+  ): Promise<CompileJob> {
+    const pollInterval = options?.pollInterval ?? 500;
+    const timeout = options?.timeout ?? 60_000;
+
+    const job = await this.compileMemoriesAsync(subjectId);
+    const start = Date.now();
+    while (Date.now() - start < timeout) {
+      await new Promise(r => setTimeout(r, pollInterval));
+      const status = await this.getCompileStatus(job.job_id);
+      if (status.status === "completed" || status.status === "failed") {
+        return status;
+      }
+    }
+    throw new Error(`Compile job ${job.job_id} did not complete within ${timeout}ms`);
   }
 
   async searchMemories(params: SearchMemoriesParams): Promise<SearchResult> {

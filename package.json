@@ -1,6 +1,6 @@
 {
   "name": "statewave-ts",
-  "version": "0.4.3",
+  "version": "0.5.0",
   "description": "Official TypeScript SDK for Statewave — Memory OS for AI agents",
   "type": "module",
   "main": "dist/index.js",

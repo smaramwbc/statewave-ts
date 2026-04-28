@@ -76,6 +76,16 @@ export interface ListSubjectsResult {
   total: number;
 }
 
+/** Status of an async compile job. */
+export interface CompileJob {
+  job_id: string;
+  status: "pending" | "running" | "completed" | "failed";
+  subject_id: string;
+  memories_created?: number;
+  memories?: Memory[];
+  error?: string;
+}
+
 export interface CreateEpisodeParams {
   subject_id: string;
   source: string;
