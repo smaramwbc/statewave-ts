@@ -13,7 +13,7 @@
   },
   "files": ["dist", "README.md", "LICENSE"],
   "license": "Apache-2.0",
-  "author": "Statewave <hello@statewave.dev>",
+  "author": "Statewave <hello@statewave.ai>",
   "keywords": ["statewave", "ai", "agents", "memory", "context", "sdk", "typescript"],
   "repository": {
     "type": "git",
