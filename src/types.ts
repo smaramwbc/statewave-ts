@@ -93,6 +93,7 @@ export interface CreateEpisodeParams {
   payload: Record<string, unknown>;
   metadata?: Record<string, unknown>;
   provenance?: Record<string, unknown>;
+  session_id?: string;
 }
 
 export interface SearchMemoriesParams {
