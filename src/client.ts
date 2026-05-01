@@ -47,7 +47,10 @@ export class StatewaveClient {
 
   constructor(options: ClientOptions | string = "http://localhost:8100") {
     const opts = typeof options === "string" ? { baseUrl: options } : options;
-    this.baseUrl = (opts.baseUrl ?? "http://localhost:8100").replace(/\/+$/, "");
+    const rawBaseUrl = opts.baseUrl ?? "http://localhost:8100";
+    let end = rawBaseUrl.length;
+    while (end > 0 && rawBaseUrl[end - 1] === "/") end--;
+    this.baseUrl = rawBaseUrl.slice(0, end);
     this.defaultHeaders = {};
     if (opts.apiKey) this.defaultHeaders["X-API-Key"] = opts.apiKey;
     if (opts.tenantId) this.defaultHeaders["X-Tenant-ID"] = opts.tenantId;
