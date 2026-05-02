@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.3 (2026-05-02)
+
+- Package metadata: `homepage` URL now points to https://statewave.ai
+- No client API changes
+
 ## 0.6.1 (2026-04-29)
 
 - Version bump to align with server v0.6.1 (support-agent intelligence stack)
