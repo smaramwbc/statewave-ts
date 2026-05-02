@@ -1,6 +1,6 @@
 {
   "name": "statewave-ts",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "Official TypeScript SDK for Statewave — Memory OS for AI agents",
   "type": "module",
   "main": "dist/index.js",
@@ -34,7 +34,7 @@
   "bugs": {
     "url": "https://github.com/smaramwbc/statewave-ts/issues"
   },
-  "homepage": "https://github.com/smaramwbc/statewave-ts#readme",
+  "homepage": "https://statewave.ai",
   "engines": {
     "node": ">=18"
   },
