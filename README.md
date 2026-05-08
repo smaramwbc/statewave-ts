@@ -16,8 +16,6 @@ Official TypeScript SDK for [Statewave](https://github.com/smaramwbc/statewave) 
 npm install @statewavedev/sdk
 ```
 
-> Before public launch, this package used the internal name `statewave-ts`. New code should use `@statewavedev/sdk`.
-
 ## Quick start
 
 ```typescript
