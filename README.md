@@ -1,4 +1,4 @@
-# @statewavedev/sdk
+# Statewave TypeScript SDK
 
 [![CI](https://github.com/smaramwbc/statewave-ts/workflows/CI/badge.svg)](https://github.com/smaramwbc/statewave-ts/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@statewavedev/sdk)](https://www.npmjs.com/package/@statewavedev/sdk)
