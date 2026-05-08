@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.7.0 (unreleased) — pre-public package rename
+
+The npm package was renamed from `statewave-ts` to `@statewavedev/sdk` before public launch, aligning with the rest of the ecosystem (`@statewavedev/connectors-*`, `@statewavedev/mcp-server`). Runtime API unchanged.
+
+- Package: `@statewavedev/sdk`
+- Install: `npm install @statewavedev/sdk`
+- Import: `import { StatewaveClient } from "@statewavedev/sdk"`
+- `publishConfig.{access:"public",provenance:true}` so releases publish with npm provenance attestations
+- `exports` adds `./package.json`
+- `sideEffects: false`
+
+The legacy `statewave-ts` package on npm (last published at 0.6.3) will be deprecated with `npm deprecate "statewave-ts@*" "Renamed to @statewavedev/sdk. Run: npm install @statewavedev/sdk"` after `@statewavedev/sdk` is live.
+
 ## 0.6.3 (2026-05-02)
 
 - Package metadata: `homepage` URL now points to https://statewave.ai

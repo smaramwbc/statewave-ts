@@ -1,25 +1,27 @@
-# statewave-ts
+# @statewavedev/sdk
 
 [![CI](https://github.com/smaramwbc/statewave-ts/workflows/CI/badge.svg)](https://github.com/smaramwbc/statewave-ts/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/statewave-ts)](https://www.npmjs.com/package/statewave-ts)
+[![npm](https://img.shields.io/npm/v/@statewavedev/sdk)](https://www.npmjs.com/package/@statewavedev/sdk)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 Official TypeScript SDK for [Statewave](https://github.com/smaramwbc/statewave) — memory runtime for AI agents and applications.
 
-> **Part of the Statewave ecosystem:** [Server](https://github.com/smaramwbc/statewave) · [Python SDK](https://github.com/smaramwbc/statewave-py) · **TypeScript SDK** · [Docs](https://github.com/smaramwbc/statewave-docs) · [Examples](https://github.com/smaramwbc/statewave-examples) · [Website + demo](https://statewave.ai) · [Admin](https://github.com/smaramwbc/statewave-admin)
+> **Part of the Statewave ecosystem:** [Server](https://github.com/smaramwbc/statewave) · [Python SDK](https://github.com/smaramwbc/statewave-py) · **TypeScript SDK** · [Connectors](https://github.com/smaramwbc/statewave-connectors) · [Docs](https://github.com/smaramwbc/statewave-docs) · [Examples](https://github.com/smaramwbc/statewave-examples) · [Website + demo](https://statewave.ai) · [Admin](https://github.com/smaramwbc/statewave-admin)
 >
 > 📋 **Issues & feature requests:** [statewave/issues](https://github.com/smaramwbc/statewave/issues) (centralized tracker)
 
 ## Install
 
 ```bash
-npm install statewave-ts
+npm install @statewavedev/sdk
 ```
+
+> Before public launch, this package used the internal name `statewave-ts`. New code should use `@statewavedev/sdk`.
 
 ## Quick start
 
 ```typescript
-import { StatewaveClient } from "statewave-ts";
+import { StatewaveClient } from "@statewavedev/sdk";
 
 // Basic (no auth)
 const sw = new StatewaveClient("http://localhost:8100");
@@ -92,7 +94,7 @@ await sw.deleteSubject("user-42");
 ## Error handling
 
 ```typescript
-import { StatewaveClient, StatewaveAPIError, StatewaveConnectionError } from "statewave-ts";
+import { StatewaveClient, StatewaveAPIError, StatewaveConnectionError } from "@statewavedev/sdk";
 
 const sw = new StatewaveClient();
 
