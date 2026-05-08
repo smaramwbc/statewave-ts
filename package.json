@@ -1,6 +1,6 @@
 {
-  "name": "statewave-ts",
-  "version": "0.6.3",
+  "name": "@statewavedev/sdk",
+  "version": "0.7.0",
   "description": "Official TypeScript SDK for Statewave — Memory OS for AI agents",
   "type": "module",
   "main": "dist/index.js",
@@ -9,7 +9,8 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
@@ -38,6 +39,11 @@
   "engines": {
     "node": ">=18"
   },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "sideEffects": false,
   "scripts": {
     "build": "tsc",
     "prepublishOnly": "tsc",
