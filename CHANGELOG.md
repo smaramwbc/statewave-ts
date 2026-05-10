@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.1 (2026-05-10)
+
+- Package `description` aligned to the canonical Statewave tagline: "Official TypeScript SDK for Statewave — the open-source memory runtime for AI agents."
+- No client API changes.
+
 ## 0.7.0 — first public release as `@statewavedev/sdk`
 
 - Install: `npm install @statewavedev/sdk`
