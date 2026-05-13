@@ -70,6 +70,117 @@ describe("exports", () => {
   });
 });
 
+describe("Receipts", () => {
+  it("getContext forwards emit_receipt and receipt correlation ids", async () => {
+    const mockFetch = vi.fn(async (_url: string, init?: RequestInit) => {
+      const body = JSON.parse(init?.body as string);
+      // The mock returns the body it received so the test can assert on it.
+      return new Response(
+        JSON.stringify({
+          subject_id: body.subject_id,
+          task: body.task,
+          facts: [],
+          episodes: [],
+          procedures: [],
+          provenance: {},
+          assembled_context: "",
+          token_estimate: 0,
+          receipt_id: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+          receipt_emitted: true,
+          // Echo the request body fields back so we can assert forwarding.
+          _echo: body,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const client = new StatewaveClient({ retry: false });
+    const bundle = await client.getContext({
+      subject_id: "u1",
+      task: "anything",
+      emit_receipt: true,
+      query_id: "q-1",
+      task_id: "t-1",
+      parent_receipt_id: "01ARZ3NDEKTSV4RRFFQ69G5FA0",
+    });
+    expect(bundle.receipt_id).toBe("01ARZ3NDEKTSV4RRFFQ69G5FAV");
+    expect(bundle.receipt_emitted).toBe(true);
+    const sent = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(sent.emit_receipt).toBe(true);
+    expect(sent.query_id).toBe("q-1");
+    expect(sent.task_id).toBe("t-1");
+    expect(sent.parent_receipt_id).toBe("01ARZ3NDEKTSV4RRFFQ69G5FA0");
+    vi.unstubAllGlobals();
+  });
+
+  it("getReceipt hits the right path and parses the body", async () => {
+    const mockFetch = vi.fn(async (url: string) => {
+      expect(url).toContain("/v1/receipts/01ARZ3NDEKTSV4RRFFQ69G5FAV");
+      return new Response(
+        JSON.stringify({
+          receipt_id: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+          parent_receipt_id: null,
+          mode: "retrieval",
+          query_id: null,
+          task_id: null,
+          tenant_id: null,
+          subject_id: "u1",
+          task: "x",
+          as_of: "2026-05-12T10:00:00+00:00",
+          created_at: "2026-05-12T10:00:00+00:00",
+          selected_entries: [],
+          policy: {
+            policy_bundle_hash: null,
+            filters_applied: [],
+            filters_skipped: [],
+            mode: "log_only",
+          },
+          output: {
+            context_hash: "abc",
+            context_size_bytes: 0,
+            canonicalization_version: 1,
+            token_estimate: 0,
+          },
+          region: null,
+          receipt_signature: null,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const client = new StatewaveClient({ retry: false });
+    const receipt = await client.getReceipt("01ARZ3NDEKTSV4RRFFQ69G5FAV");
+    expect(receipt.mode).toBe("retrieval");
+    expect(receipt.policy.mode).toBe("log_only");
+    vi.unstubAllGlobals();
+  });
+
+  it("listReceipts encodes pagination params", async () => {
+    const mockFetch = vi.fn(async (url: string) => {
+      expect(url).toContain("subject_id=u1");
+      expect(url).toContain("limit=5");
+      expect(url).toContain("cursor=01ARZ3NDEKTSV4RRFFQ69G5FA0");
+      return new Response(JSON.stringify({ receipts: [], next_cursor: null }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const client = new StatewaveClient({ retry: false });
+    const out = await client.listReceipts({
+      subject_id: "u1",
+      limit: 5,
+      cursor: "01ARZ3NDEKTSV4RRFFQ69G5FA0",
+    });
+    expect(out.receipts).toEqual([]);
+    expect(out.next_cursor).toBeNull();
+    vi.unstubAllGlobals();
+  });
+});
+
 describe("Retry behavior", () => {
   it("can be configured with retry options", () => {
     const client = new StatewaveClient({ retry: { maxRetries: 5, backoffBase: 100 } });
