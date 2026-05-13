@@ -46,6 +46,89 @@ export interface ContextBundle {
   provenance: Record<string, unknown>;
   assembled_context: string;
   token_estimate: number;
+  /** ULID of the state-assembly receipt, when one was emitted. */
+  receipt_id?: string | null;
+  /** True iff a receipt was successfully written for this call. */
+  receipt_emitted?: boolean;
+}
+
+/**
+ * One entry inside a state-assembly receipt. Strict-superset shape —
+ * fields not relevant to the entry's `type` are null. See
+ * `docs/state-assembly-receipts.md` in the server repository for the
+ * full schema.
+ */
+export interface ReceiptSelectedEntry {
+  type: "memory" | "episode";
+  /** Present when type === "memory". */
+  memory_id?: string;
+  /** Present when type === "memory". */
+  kind?: string;
+  valid_from?: string | null;
+  valid_to?: string | null;
+  supersession_status?: "active" | "superseded" | "tombstoned";
+  source_episode_ids?: string[];
+  provenance_hash?: string;
+  fact_key?: string | null;
+  conflict_status?: "none" | "merged" | "overridden" | "unresolved";
+  /** Present when type === "episode". */
+  episode_id?: string;
+  source?: string;
+  event_type?: string;
+  occurred_at?: string | null;
+  /** Final position in the assembled bundle. */
+  rank: number;
+  score?: number | null;
+}
+
+export interface ReceiptPolicy {
+  policy_bundle_hash: string | null;
+  filters_applied: unknown[];
+  filters_skipped: unknown[];
+  mode: "log_only" | "enforce";
+}
+
+export interface ReceiptOutput {
+  context_hash: string;
+  context_size_bytes: number;
+  canonicalization_version: number;
+  token_estimate: number;
+}
+
+/**
+ * Immutable per-retrieval audit artifact for a single context assembly.
+ * See `docs/state-assembly-receipts.md` in the server repository.
+ */
+export interface Receipt {
+  receipt_id: string;
+  parent_receipt_id: string | null;
+  mode: "retrieval" | string;
+  query_id: string | null;
+  task_id: string | null;
+  tenant_id: string | null;
+  subject_id: string;
+  task: string;
+  as_of: string;
+  created_at: string;
+  selected_entries: ReceiptSelectedEntry[];
+  policy: ReceiptPolicy;
+  output: ReceiptOutput;
+  region: string | null;
+  receipt_signature: string | null;
+}
+
+export interface ReceiptList {
+  receipts: Receipt[];
+  /** Pass back as the `cursor` param to fetch the next page; null when no more. */
+  next_cursor: string | null;
+}
+
+export interface ListReceiptsParams {
+  subject_id: string;
+  since?: string;
+  until?: string;
+  cursor?: string;
+  limit?: number;
 }
 
 export interface Timeline {
@@ -108,6 +191,17 @@ export interface GetContextParams {
   subject_id: string;
   task: string;
   max_tokens?: number;
+  session_id?: string;
+  /**
+   * Opt in to emitting a state-assembly receipt for this call. The
+   * tenant config can also force emission on or off independently of
+   * this flag. See `docs/state-assembly-receipts.md` in the server
+   * repository.
+   */
+  emit_receipt?: boolean;
+  query_id?: string;
+  task_id?: string;
+  parent_receipt_id?: string;
 }
 
 export interface ClientOptions {

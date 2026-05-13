@@ -8,7 +8,10 @@ import type {
   DeleteResult,
   Episode,
   GetContextParams,
+  ListReceiptsParams,
   ListSubjectsResult,
+  Receipt,
+  ReceiptList,
   RetryConfig,
   SearchMemoriesParams,
   SearchResult,
@@ -135,6 +138,13 @@ export class StatewaveClient {
       subject_id: params.subject_id,
       task: params.task,
       ...(params.max_tokens !== undefined && { max_tokens: params.max_tokens }),
+      ...(params.session_id !== undefined && { session_id: params.session_id }),
+      ...(params.emit_receipt !== undefined && { emit_receipt: params.emit_receipt }),
+      ...(params.query_id !== undefined && { query_id: params.query_id }),
+      ...(params.task_id !== undefined && { task_id: params.task_id }),
+      ...(params.parent_receipt_id !== undefined && {
+        parent_receipt_id: params.parent_receipt_id,
+      }),
     });
   }
 
@@ -142,6 +152,27 @@ export class StatewaveClient {
   async getContextString(params: GetContextParams): Promise<string> {
     const bundle = await this.getContext(params);
     return bundle.assembled_context;
+  }
+
+  // -- Receipts --------------------------------------------------------
+
+  /** Fetch a single state-assembly receipt by ULID. */
+  async getReceipt(receiptId: string): Promise<Receipt> {
+    return this.get(`/v1/receipts/${encodeURIComponent(receiptId)}`);
+  }
+
+  /**
+   * List state-assembly receipts for a subject, newest first.
+   * Cursor-paginated — pass back the previous response's `next_cursor`
+   * to fetch the next page.
+   */
+  async listReceipts(params: ListReceiptsParams): Promise<ReceiptList> {
+    const qs = new URLSearchParams({ subject_id: params.subject_id });
+    if (params.since !== undefined) qs.set("since", params.since);
+    if (params.until !== undefined) qs.set("until", params.until);
+    if (params.cursor !== undefined) qs.set("cursor", params.cursor);
+    if (params.limit !== undefined) qs.set("limit", String(params.limit));
+    return this.get(`/v1/receipts?${qs}`);
   }
 
   async getTimeline(subjectId: string): Promise<Timeline> {
