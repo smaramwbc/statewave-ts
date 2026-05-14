@@ -70,6 +70,79 @@ describe("exports", () => {
   });
 });
 
+describe("Sensitivity labels (#50)", () => {
+  it("getContext forwards caller_id and caller_type", async () => {
+    const mockFetch = vi.fn(async (_url: string, init?: RequestInit) => {
+      const body = JSON.parse(init?.body as string);
+      return new Response(
+        JSON.stringify({
+          subject_id: body.subject_id,
+          task: body.task,
+          facts: [],
+          episodes: [],
+          procedures: [],
+          provenance: {},
+          assembled_context: "",
+          token_estimate: 0,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const client = new StatewaveClient({ retry: false });
+    await client.getContext({
+      subject_id: "u1",
+      task: "x",
+      caller_id: "agent-7",
+      caller_type: "support_agent",
+    });
+    const sent = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(sent.caller_id).toBe("agent-7");
+    expect(sent.caller_type).toBe("support_agent");
+    vi.unstubAllGlobals();
+  });
+
+  it("setMemoryLabels PATCHes the right path with the labels list", async () => {
+    const mockFetch = vi.fn(async (url: string, init?: RequestInit) => {
+      expect(url).toContain("/v1/memories/mem-42/labels");
+      expect(init?.method).toBe("PATCH");
+      const body = JSON.parse(init?.body as string);
+      expect(body.sensitivity_labels).toEqual(["pii", "financial"]);
+      return new Response(
+        JSON.stringify({
+          id: "00000000-0000-0000-0000-000000000042",
+          subject_id: "u1",
+          kind: "profile_fact",
+          content: "x",
+          summary: "",
+          confidence: 1.0,
+          valid_from: "2026-01-01T00:00:00Z",
+          valid_to: null,
+          source_episode_ids: [],
+          metadata: {},
+          status: "active",
+          sensitivity_labels: ["financial", "pii"],
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z",
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const client = new StatewaveClient({ retry: false });
+    const memory = await client.setMemoryLabels({
+      memory_id: "mem-42",
+      sensitivity_labels: ["pii", "financial"],
+    });
+    // Server normalizes (sorted, lowercased) — the SDK passes the
+    // canonical set through verbatim.
+    expect(memory.sensitivity_labels).toEqual(["financial", "pii"]);
+    vi.unstubAllGlobals();
+  });
+});
+
 describe("Receipts", () => {
   it("getContext forwards emit_receipt and receipt correlation ids", async () => {
     const mockFetch = vi.fn(async (_url: string, init?: RequestInit) => {
