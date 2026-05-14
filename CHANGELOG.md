@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.8.0 (2026-05-14)
+
+### Added — governance & audit surface
+
+- `Receipt`, `ReceiptSelectedEntry`, `ReceiptPolicy`, `ReceiptOutput`, `ReceiptList`, `ListReceiptsParams`, `SetMemoryLabelsParams` — first-class TypeScript types for the new state-assembly receipt schema and the policy-layer surface.
+- `ContextBundle` gains optional `receipt_id?: string | null` and `receipt_emitted?: boolean` — `?` so responses from older servers parse cleanly.
+- `Memory` gains optional `sensitivity_labels?: string[]` — the per-memory capability tags consumed by the policy layer.
+- `GetContextParams` accepts new optional fields:
+  - `emit_receipt?: boolean` — opt-in per-request receipt emission (overridden by tenant config).
+  - `query_id?`, `task_id?` — caller-supplied correlation ids recorded on the receipt.
+  - `parent_receipt_id?` — ULID of a parent receipt to chain multi-step tasks.
+  - `caller_id?`, `caller_type?` — identity fed to the sensitivity-label policy evaluator.
+- New client methods on `StatewaveClient`:
+  - `getReceipt(receiptId): Promise<Receipt>` — fetch one receipt by ULID.
+  - `listReceipts(params): Promise<ReceiptList>` — cursor-paginated, newest-first.
+  - `setMemoryLabels(params): Promise<Memory>` — replace `sensitivity_labels`; server normalizes (dedup + lowercase + trim).
+
+### Notes
+
+- All new fields and methods are backwards-compatible. The new types use `?` for fields that older servers omit; the SDK doesn't break when calling pre-#49 servers.
+- Companion server release at the same version (statewave v0.8.0).
+
 ## 0.7.2 (2026-05-12)
 
 - Version aligned with server v0.7.2 (per-kind memory TTL, Helm chart, query embedding cache, `MemoryStatus.tombstoned` rename).
