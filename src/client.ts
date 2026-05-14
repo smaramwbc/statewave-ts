@@ -10,11 +10,13 @@ import type {
   GetContextParams,
   ListReceiptsParams,
   ListSubjectsResult,
+  Memory,
   Receipt,
   ReceiptList,
   RetryConfig,
   SearchMemoriesParams,
   SearchResult,
+  SetMemoryLabelsParams,
   Timeline,
 } from "./types.js";
 
@@ -145,7 +147,25 @@ export class StatewaveClient {
       ...(params.parent_receipt_id !== undefined && {
         parent_receipt_id: params.parent_receipt_id,
       }),
+      ...(params.caller_id !== undefined && { caller_id: params.caller_id }),
+      ...(params.caller_type !== undefined && { caller_type: params.caller_type }),
     });
+  }
+
+  // -- Memory labels (#50) ----------------------------------------------
+
+  /**
+   * Replace a memory's sensitivity_labels. Server normalizes
+   * (dedup + lowercase + trim) and caps at 32 entries. Empty array
+   * clears all labels — the memory becomes untagged and any policy
+   * rule that depends on a label match falls through to default-allow.
+   */
+  async setMemoryLabels(params: SetMemoryLabelsParams): Promise<Memory> {
+    return this.request(
+      "PATCH",
+      `/v1/memories/${encodeURIComponent(params.memory_id)}/labels`,
+      { sensitivity_labels: params.sensitivity_labels },
+    );
   }
 
   /** Return just the assembled context string, ready to inject into a prompt. */

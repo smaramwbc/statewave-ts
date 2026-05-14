@@ -23,6 +23,12 @@ export interface Memory {
   source_episode_ids: string[];
   metadata: Record<string, unknown>;
   status: string;
+  /**
+   * Per-memory capability tags consumed by the sensitivity-label
+   * policy layer (#50). Empty = untagged = policy default-allow.
+   * Older servers without the policy layer omit the field.
+   */
+  sensitivity_labels?: string[];
   created_at: string;
   updated_at: string;
 }
@@ -202,6 +208,22 @@ export interface GetContextParams {
   query_id?: string;
   task_id?: string;
   parent_receipt_id?: string;
+  /**
+   * Caller identity consumed by the sensitivity-label policy layer
+   * (#50). When the tenant config sets `require_caller_identity:
+   * true`, both `caller_id` and `caller_type` are mandatory.
+   */
+  caller_id?: string;
+  caller_type?: string;
+}
+
+export interface SetMemoryLabelsParams {
+  memory_id: string;
+  /**
+   * Replacement label list. Server normalizes (dedup + lowercase +
+   * trim) and caps at 32 entries. Empty list clears all labels.
+   */
+  sensitivity_labels: string[];
 }
 
 export interface ClientOptions {
