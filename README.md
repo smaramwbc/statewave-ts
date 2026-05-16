@@ -10,6 +10,8 @@ Official TypeScript SDK for [Statewave](https://github.com/smaramwbc/statewave) 
 >
 > 📋 **Issues & feature requests:** [statewave/issues](https://github.com/smaramwbc/statewave/issues) (centralized tracker)
 
+> ⚠️ **v0.9.0 is a breaking change.** The entire SDK surface — request params *and* response fields — is now idiomatic **camelCase** (`subjectId`, `maxTokens`, `createdAt`, `receiptId`, …). The wire protocol is unchanged; the client maps to/from the server's snake_case transparently. `payload`, `metadata`, and `provenance` are passed through verbatim — their inner keys are never rewritten. See [CHANGELOG](CHANGELOG.md#090) for the full rename table and migration steps.
+
 ## Install
 
 ```bash
@@ -33,7 +35,7 @@ const swAuth = new StatewaveClient({
 
 // Record an episode
 await sw.createEpisode({
-  subject_id: "user-42",
+  subjectId: "user-42",
   source: "support-chat",
   type: "conversation",
   payload: {
@@ -46,31 +48,31 @@ await sw.createEpisode({
 
 // Compile memories (idempotent)
 const result = await sw.compileMemories("user-42");
-console.log(`Created ${result.memories_created} memories`);
+console.log(`Created ${result.memoriesCreated} memories`);
 
 // Retrieve ranked, token-bounded context
 const ctx = await sw.getContext({
-  subject_id: "user-42",
+  subjectId: "user-42",
   task: "Help with billing",
-  max_tokens: 300,
+  maxTokens: 300,
 });
-console.log(ctx.assembled_context);
+console.log(ctx.assembledContext);
 
 // Batch ingestion (up to 100)
 await sw.createEpisodesBatch([
-  { subject_id: "user-42", source: "crm", type: "note", payload: { text: "Prefers email" } },
-  { subject_id: "user-42", source: "crm", type: "note", payload: { text: "Enterprise plan" } },
+  { subjectId: "user-42", source: "crm", type: "note", payload: { text: "Prefers email" } },
+  { subjectId: "user-42", source: "crm", type: "note", payload: { text: "Enterprise plan" } },
 ]);
 
 // Search memories
 const facts = await sw.searchMemories({
-  subject_id: "user-42",
+  subjectId: "user-42",
   kind: "profile_fact",
 });
 
 // Semantic search (requires embeddings)
 const results = await sw.searchMemories({
-  subject_id: "user-42",
+  subjectId: "user-42",
   query: "billing",
   semantic: true,
 });
@@ -78,7 +80,7 @@ const results = await sw.searchMemories({
 // List all known subjects
 const subjects = await sw.listSubjects();
 for (const s of subjects.subjects) {
-  console.log(`${s.subject_id}: ${s.episode_count} episodes, ${s.memory_count} memories`);
+  console.log(`${s.subjectId}: ${s.episodeCount} episodes, ${s.memoryCount} memories`);
 }
 
 // Get timeline
@@ -103,45 +105,45 @@ const sw = new StatewaveClient({
 });
 
 // Per-request opt-in for an immutable audit receipt of the assembly.
-// caller_id / caller_type feed the sensitivity-label policy engine —
+// callerId / callerType feed the sensitivity-label policy engine —
 // when the tenant config sets require_caller_identity=true, missing
 // values 401.
 const bundle = await sw.getContext({
-  subject_id: "user-42",
+  subjectId: "user-42",
   task: "What plan is this customer on?",
-  emit_receipt: true,
-  caller_id: "agent-7",
-  caller_type: "support_agent",
+  emitReceipt: true,
+  callerId: "agent-7",
+  callerType: "support_agent",
 });
 
-if (bundle.receipt_id) {
+if (bundle.receiptId) {
   // Receipts are ULID-addressable, tenant-scoped, append-only.
-  const receipt = await sw.getReceipt(bundle.receipt_id);
-  // output.context_hash is a SHA-256 of the bytes delivered to the
-  // agent — recompute from bundle.assembled_context to verify integrity.
-  console.log(receipt.output.context_hash);
-  console.log(`${receipt.selected_entries.length} entries influenced this bundle`);
+  const receipt = await sw.getReceipt(bundle.receiptId);
+  // output.contextHash is a SHA-256 of the bytes delivered to the
+  // agent — recompute from bundle.assembledContext to verify integrity.
+  console.log(receipt.output.contextHash);
+  console.log(`${receipt.selectedEntries.length} entries influenced this bundle`);
 }
 
 // List receipts for a subject, cursor-paginated, newest-first.
-const { receipts, next_cursor } = await sw.listReceipts({
-  subject_id: "user-42",
+const { receipts, nextCursor } = await sw.listReceipts({
+  subjectId: "user-42",
   limit: 10,
 });
 for (const r of receipts) {
-  console.log(r.receipt_id, r.task);
+  console.log(r.receiptId, r.task);
 }
 
 // Set per-memory sensitivity labels (server normalizes — dedup, lowercase, trim).
 // Memories with labels become subject to any active policy bundle for the tenant.
 const updated = await sw.setMemoryLabels({
-  memory_id: "mem-uuid",
-  sensitivity_labels: ["pii", "financial"],
+  memoryId: "mem-uuid",
+  sensitivityLabels: ["pii", "financial"],
 });
-console.log(updated.sensitivity_labels); // → ["financial", "pii"]
+console.log(updated.sensitivityLabels); // → ["financial", "pii"]
 ```
 
-Receipts and the policy engine cooperate: every assembly call records its policy decisions into `receipt.policy.filters_applied` (one entry per memory the policy fired on) and `receipt.policy.filters_skipped` (per-rule summary of what didn't fire). In `log_only` mode (the tenant default) the receipt is the full audit trail without filtering; under `enforce` denied memories are dropped before they reach the assembly and the deny is still recorded. See [`receipts.md`](https://github.com/smaramwbc/statewave-docs/blob/main/receipts.md) and [`sensitivity-labels.md`](https://github.com/smaramwbc/statewave-docs/blob/main/sensitivity-labels.md) for the full schemas and policy YAML format.
+Receipts and the policy engine cooperate: every assembly call records its policy decisions into `receipt.policy.filtersApplied` (one entry per memory the policy fired on) and `receipt.policy.filtersSkipped` (per-rule summary of what didn't fire). In `log_only` mode (the tenant default) the receipt is the full audit trail without filtering; under `enforce` denied memories are dropped before they reach the assembly and the deny is still recorded. See [`receipts.md`](https://github.com/smaramwbc/statewave-docs/blob/main/receipts.md) and [`sensitivity-labels.md`](https://github.com/smaramwbc/statewave-docs/blob/main/sensitivity-labels.md) for the full schemas and policy YAML format.
 
 ## Error handling
 
@@ -176,10 +178,10 @@ See [Privacy & Data Flow](https://github.com/smaramwbc/statewave-docs/blob/main/
 All response types are fully typed:
 
 - `Episode` — raw interaction record
-- `Memory` — compiled memory with provenance + optional `sensitivity_labels`
+- `Memory` — compiled memory with provenance + optional `sensitivityLabels`
 - `CompileResult` — compilation response
 - `SearchResult` — search response
-- `ContextBundle` — assembled context with facts, episodes, provenance, optional `receipt_id` / `receipt_emitted`
+- `ContextBundle` — assembled context with facts, episodes, provenance, optional `receiptId` / `receiptEmitted`
 - `Timeline` — chronological subject history
 - `DeleteResult` — deletion confirmation
 - `BatchCreateResult` — batch ingestion response

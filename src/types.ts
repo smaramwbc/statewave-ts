@@ -1,26 +1,35 @@
-/** Statewave API types — mirrors the backend contract. */
+/**
+ * Statewave API types.
+ *
+ * The public SDK surface is camelCase, idiomatic TypeScript. The
+ * Statewave HTTP API speaks snake_case on the wire; `StatewaveClient`
+ * transparently maps between the two in both directions, so callers
+ * never see a snake_case key. The free-form `payload`, `metadata`, and
+ * `provenance` bags are passed through verbatim — their inner keys are
+ * never rewritten, so arbitrary user data round-trips losslessly.
+ */
 
 export interface Episode {
   id: string;
-  subject_id: string;
+  subjectId: string;
   source: string;
   type: string;
   payload: Record<string, unknown>;
   metadata: Record<string, unknown>;
   provenance: Record<string, unknown>;
-  created_at: string;
+  createdAt: string;
 }
 
 export interface Memory {
   id: string;
-  subject_id: string;
+  subjectId: string;
   kind: string;
   content: string;
   summary: string;
   confidence: number;
-  valid_from: string;
-  valid_to: string | null;
-  source_episode_ids: string[];
+  validFrom: string;
+  validTo: string | null;
+  sourceEpisodeIds: string[];
   metadata: Record<string, unknown>;
   status: string;
   /**
@@ -28,14 +37,14 @@ export interface Memory {
    * policy layer (#50). Empty = untagged = policy default-allow.
    * Older servers without the policy layer omit the field.
    */
-  sensitivity_labels?: string[];
-  created_at: string;
-  updated_at: string;
+  sensitivityLabels?: string[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CompileResult {
-  subject_id: string;
-  memories_created: number;
+  subjectId: string;
+  memoriesCreated: number;
   memories: Memory[];
 }
 
@@ -44,18 +53,18 @@ export interface SearchResult {
 }
 
 export interface ContextBundle {
-  subject_id: string;
+  subjectId: string;
   task: string;
   facts: Memory[];
   episodes: Episode[];
   procedures: Memory[];
   provenance: Record<string, unknown>;
-  assembled_context: string;
-  token_estimate: number;
+  assembledContext: string;
+  tokenEstimate: number;
   /** ULID of the state-assembly receipt, when one was emitted. */
-  receipt_id?: string | null;
+  receiptId?: string | null;
   /** True iff a receipt was successfully written for this call. */
-  receipt_emitted?: boolean;
+  receiptEmitted?: boolean;
 }
 
 /**
@@ -67,38 +76,38 @@ export interface ContextBundle {
 export interface ReceiptSelectedEntry {
   type: "memory" | "episode";
   /** Present when type === "memory". */
-  memory_id?: string;
+  memoryId?: string;
   /** Present when type === "memory". */
   kind?: string;
-  valid_from?: string | null;
-  valid_to?: string | null;
-  supersession_status?: "active" | "superseded" | "tombstoned";
-  source_episode_ids?: string[];
-  provenance_hash?: string;
-  fact_key?: string | null;
-  conflict_status?: "none" | "merged" | "overridden" | "unresolved";
+  validFrom?: string | null;
+  validTo?: string | null;
+  supersessionStatus?: "active" | "superseded" | "tombstoned";
+  sourceEpisodeIds?: string[];
+  provenanceHash?: string;
+  factKey?: string | null;
+  conflictStatus?: "none" | "merged" | "overridden" | "unresolved";
   /** Present when type === "episode". */
-  episode_id?: string;
+  episodeId?: string;
   source?: string;
-  event_type?: string;
-  occurred_at?: string | null;
+  eventType?: string;
+  occurredAt?: string | null;
   /** Final position in the assembled bundle. */
   rank: number;
   score?: number | null;
 }
 
 export interface ReceiptPolicy {
-  policy_bundle_hash: string | null;
-  filters_applied: unknown[];
-  filters_skipped: unknown[];
+  policyBundleHash: string | null;
+  filtersApplied: unknown[];
+  filtersSkipped: unknown[];
   mode: "log_only" | "enforce";
 }
 
 export interface ReceiptOutput {
-  context_hash: string;
-  context_size_bytes: number;
-  canonicalization_version: number;
-  token_estimate: number;
+  contextHash: string;
+  contextSizeBytes: number;
+  canonicalizationVersion: number;
+  tokenEstimate: number;
 }
 
 /**
@@ -106,31 +115,31 @@ export interface ReceiptOutput {
  * See `docs/state-assembly-receipts.md` in the server repository.
  */
 export interface Receipt {
-  receipt_id: string;
-  parent_receipt_id: string | null;
+  receiptId: string;
+  parentReceiptId: string | null;
   mode: "retrieval" | string;
-  query_id: string | null;
-  task_id: string | null;
-  tenant_id: string | null;
-  subject_id: string;
+  queryId: string | null;
+  taskId: string | null;
+  tenantId: string | null;
+  subjectId: string;
   task: string;
-  as_of: string;
-  created_at: string;
-  selected_entries: ReceiptSelectedEntry[];
+  asOf: string;
+  createdAt: string;
+  selectedEntries: ReceiptSelectedEntry[];
   policy: ReceiptPolicy;
   output: ReceiptOutput;
   region: string | null;
-  receipt_signature: string | null;
+  receiptSignature: string | null;
 }
 
 export interface ReceiptList {
   receipts: Receipt[];
   /** Pass back as the `cursor` param to fetch the next page; null when no more. */
-  next_cursor: string | null;
+  nextCursor: string | null;
 }
 
 export interface ListReceiptsParams {
-  subject_id: string;
+  subjectId: string;
   since?: string;
   until?: string;
   cursor?: string;
@@ -138,26 +147,26 @@ export interface ListReceiptsParams {
 }
 
 export interface Timeline {
-  subject_id: string;
+  subjectId: string;
   episodes: Episode[];
   memories: Memory[];
 }
 
 export interface DeleteResult {
-  subject_id: string;
-  episodes_deleted: number;
-  memories_deleted: number;
+  subjectId: string;
+  episodesDeleted: number;
+  memoriesDeleted: number;
 }
 
 export interface BatchCreateResult {
-  episodes_created: number;
+  episodesCreated: number;
   episodes: Episode[];
 }
 
 export interface SubjectSummary {
-  subject_id: string;
-  episode_count: number;
-  memory_count: number;
+  subjectId: string;
+  episodeCount: number;
+  memoryCount: number;
 }
 
 export interface ListSubjectsResult {
@@ -167,26 +176,26 @@ export interface ListSubjectsResult {
 
 /** Status of an async compile job. */
 export interface CompileJob {
-  job_id: string;
+  jobId: string;
   status: "pending" | "running" | "completed" | "failed";
-  subject_id: string;
-  memories_created?: number;
+  subjectId: string;
+  memoriesCreated?: number;
   memories?: Memory[];
   error?: string;
 }
 
 export interface CreateEpisodeParams {
-  subject_id: string;
+  subjectId: string;
   source: string;
   type: string;
   payload: Record<string, unknown>;
   metadata?: Record<string, unknown>;
   provenance?: Record<string, unknown>;
-  session_id?: string;
+  sessionId?: string;
 }
 
 export interface SearchMemoriesParams {
-  subject_id: string;
+  subjectId: string;
   kind?: string;
   query?: string;
   semantic?: boolean;
@@ -194,36 +203,36 @@ export interface SearchMemoriesParams {
 }
 
 export interface GetContextParams {
-  subject_id: string;
+  subjectId: string;
   task: string;
-  max_tokens?: number;
-  session_id?: string;
+  maxTokens?: number;
+  sessionId?: string;
   /**
    * Opt in to emitting a state-assembly receipt for this call. The
    * tenant config can also force emission on or off independently of
    * this flag. See `docs/state-assembly-receipts.md` in the server
    * repository.
    */
-  emit_receipt?: boolean;
-  query_id?: string;
-  task_id?: string;
-  parent_receipt_id?: string;
+  emitReceipt?: boolean;
+  queryId?: string;
+  taskId?: string;
+  parentReceiptId?: string;
   /**
    * Caller identity consumed by the sensitivity-label policy layer
    * (#50). When the tenant config sets `require_caller_identity:
-   * true`, both `caller_id` and `caller_type` are mandatory.
+   * true`, both `callerId` and `callerType` are mandatory.
    */
-  caller_id?: string;
-  caller_type?: string;
+  callerId?: string;
+  callerType?: string;
 }
 
 export interface SetMemoryLabelsParams {
-  memory_id: string;
+  memoryId: string;
   /**
    * Replacement label list. Server normalizes (dedup + lowercase +
    * trim) and caps at 32 entries. Empty list clears all labels.
    */
-  sensitivity_labels: string[];
+  sensitivityLabels: string[];
 }
 
 export interface ClientOptions {

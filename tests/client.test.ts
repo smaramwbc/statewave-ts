@@ -92,12 +92,14 @@ describe("Sensitivity labels (#50)", () => {
 
     const client = new StatewaveClient({ retry: false });
     await client.getContext({
-      subject_id: "u1",
+      subjectId: "u1",
       task: "x",
-      caller_id: "agent-7",
-      caller_type: "support_agent",
+      callerId: "agent-7",
+      callerType: "support_agent",
     });
+    // The wire body is snake_case — the SDK maps camelCase params down.
     const sent = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(sent.subject_id).toBe("u1");
     expect(sent.caller_id).toBe("agent-7");
     expect(sent.caller_type).toBe("support_agent");
     vi.unstubAllGlobals();
@@ -133,12 +135,12 @@ describe("Sensitivity labels (#50)", () => {
 
     const client = new StatewaveClient({ retry: false });
     const memory = await client.setMemoryLabels({
-      memory_id: "mem-42",
-      sensitivity_labels: ["pii", "financial"],
+      memoryId: "mem-42",
+      sensitivityLabels: ["pii", "financial"],
     });
     // Server normalizes (sorted, lowercased) — the SDK passes the
-    // canonical set through verbatim.
-    expect(memory.sensitivity_labels).toEqual(["financial", "pii"]);
+    // canonical set through verbatim, mapped back to camelCase.
+    expect(memory.sensitivityLabels).toEqual(["financial", "pii"]);
     vi.unstubAllGlobals();
   });
 });
@@ -170,15 +172,16 @@ describe("Receipts", () => {
 
     const client = new StatewaveClient({ retry: false });
     const bundle = await client.getContext({
-      subject_id: "u1",
+      subjectId: "u1",
       task: "anything",
-      emit_receipt: true,
-      query_id: "q-1",
-      task_id: "t-1",
-      parent_receipt_id: "01ARZ3NDEKTSV4RRFFQ69G5FA0",
+      emitReceipt: true,
+      queryId: "q-1",
+      taskId: "t-1",
+      parentReceiptId: "01ARZ3NDEKTSV4RRFFQ69G5FA0",
     });
-    expect(bundle.receipt_id).toBe("01ARZ3NDEKTSV4RRFFQ69G5FAV");
-    expect(bundle.receipt_emitted).toBe(true);
+    expect(bundle.receiptId).toBe("01ARZ3NDEKTSV4RRFFQ69G5FAV");
+    expect(bundle.receiptEmitted).toBe(true);
+    // Wire body stays snake_case.
     const sent = JSON.parse(mockFetch.mock.calls[0][1].body);
     expect(sent.emit_receipt).toBe(true);
     expect(sent.query_id).toBe("q-1");
@@ -227,6 +230,14 @@ describe("Receipts", () => {
     const receipt = await client.getReceipt("01ARZ3NDEKTSV4RRFFQ69G5FAV");
     expect(receipt.mode).toBe("retrieval");
     expect(receipt.policy.mode).toBe("log_only");
+    // Snake_case wire fields are mapped to camelCase, including nested.
+    expect(receipt.receiptId).toBe("01ARZ3NDEKTSV4RRFFQ69G5FAV");
+    expect(receipt.parentReceiptId).toBeNull();
+    expect(receipt.subjectId).toBe("u1");
+    expect(receipt.selectedEntries).toEqual([]);
+    expect(receipt.policy.policyBundleHash).toBeNull();
+    expect(receipt.output.contextHash).toBe("abc");
+    expect(receipt.output.canonicalizationVersion).toBe(1);
     vi.unstubAllGlobals();
   });
 
@@ -244,12 +255,12 @@ describe("Receipts", () => {
 
     const client = new StatewaveClient({ retry: false });
     const out = await client.listReceipts({
-      subject_id: "u1",
+      subjectId: "u1",
       limit: 5,
       cursor: "01ARZ3NDEKTSV4RRFFQ69G5FA0",
     });
     expect(out.receipts).toEqual([]);
-    expect(out.next_cursor).toBeNull();
+    expect(out.nextCursor).toBeNull();
     vi.unstubAllGlobals();
   });
 });
@@ -283,7 +294,7 @@ describe("Retry behavior", () => {
 
     vi.stubGlobal("fetch", mockFetch);
     const client = new StatewaveClient({ retry: { maxRetries: 2, backoffBase: 10, jitter: false } });
-    const result = await client.createEpisode({ subject_id: "s1", source: "t", type: "t", payload: {} });
+    const result = await client.createEpisode({ subjectId: "s1", source: "t", type: "t", payload: {} });
     expect(result.id).toBe("ep-1");
     expect(mockFetch).toHaveBeenCalledTimes(2);
     vi.unstubAllGlobals();
@@ -299,7 +310,7 @@ describe("Retry behavior", () => {
 
     vi.stubGlobal("fetch", mockFetch);
     const client = new StatewaveClient({ retry: { maxRetries: 3, backoffBase: 10 } });
-    await expect(client.createEpisode({ subject_id: "s1", source: "t", type: "t", payload: {} }))
+    await expect(client.createEpisode({ subjectId: "s1", source: "t", type: "t", payload: {} }))
       .rejects.toThrow(StatewaveAPIError);
     expect(mockFetch).toHaveBeenCalledTimes(1);
     vi.unstubAllGlobals();
@@ -318,7 +329,7 @@ describe("Retry behavior", () => {
 
     vi.stubGlobal("fetch", mockFetch);
     const client = new StatewaveClient({ retry: { maxRetries: 2, backoffBase: 10, jitter: false } });
-    const result = await client.createEpisode({ subject_id: "s1", source: "t", type: "t", payload: {} });
+    const result = await client.createEpisode({ subjectId: "s1", source: "t", type: "t", payload: {} });
     expect(result.id).toBe("ep-1");
     vi.unstubAllGlobals();
   });
@@ -328,7 +339,7 @@ describe("Retry behavior", () => {
 
     vi.stubGlobal("fetch", mockFetch);
     const client = new StatewaveClient({ retry: { maxRetries: 2, backoffBase: 10, jitter: false } });
-    await expect(client.createEpisode({ subject_id: "s1", source: "t", type: "t", payload: {} }))
+    await expect(client.createEpisode({ subjectId: "s1", source: "t", type: "t", payload: {} }))
       .rejects.toThrow(StatewaveConnectionError);
     expect(mockFetch).toHaveBeenCalledTimes(3); // initial + 2 retries
     vi.unstubAllGlobals();
@@ -352,7 +363,7 @@ describe("Retry behavior", () => {
 
     vi.stubGlobal("fetch", mockFetch);
     const client = new StatewaveClient({ retry: { maxRetries: 1, backoffBase: 10, jitter: false } });
-    const result = await client.createEpisode({ subject_id: "s1", source: "t", type: "t", payload: {} });
+    const result = await client.createEpisode({ subjectId: "s1", source: "t", type: "t", payload: {} });
     expect(result.id).toBe("ep-1");
     vi.unstubAllGlobals();
   });

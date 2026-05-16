@@ -20,6 +20,52 @@ import type {
   Timeline,
 } from "./types.js";
 
+/**
+ * Free-form bags whose contents are user-owned. Their *inner* keys are
+ * never rewritten in either direction so arbitrary caller data (which
+ * may itself contain snake_case or camelCase keys) round-trips
+ * byte-for-byte. The key names themselves are single words, so they are
+ * unchanged by case conversion regardless.
+ */
+const OPAQUE_KEYS = new Set(["payload", "metadata", "provenance"]);
+
+function snakeKeyToCamel(key: string): string {
+  return key.replace(/_+([a-zA-Z0-9])/g, (_, c: string) => c.toUpperCase());
+}
+
+function camelKeyToSnake(key: string): string {
+  return key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+}
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === "object" && !Array.isArray(v);
+}
+
+function mapKeys(value: unknown, convert: (k: string) => string): unknown {
+  if (Array.isArray(value)) {
+    return value.map((v) => mapKeys(v, convert));
+  }
+  if (isPlainObject(value)) {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value)) {
+      // Opaque bag: keep the verbatim value, don't recurse into it.
+      out[convert(k)] = OPAQUE_KEYS.has(k) ? v : mapKeys(v, convert);
+    }
+    return out;
+  }
+  return value;
+}
+
+/** Wire (snake_case) → public SDK shape (camelCase). */
+function fromWire<T>(value: unknown): T {
+  return mapKeys(value, snakeKeyToCamel) as T;
+}
+
+/** Public SDK shape (camelCase) → wire (snake_case). */
+function toWire(value: unknown): unknown {
+  return mapKeys(value, camelKeyToSnake);
+}
+
 /** Structured error from the Statewave API. */
 export class StatewaveAPIError extends Error {
   readonly statusCode: number;
@@ -72,7 +118,7 @@ export class StatewaveClient {
 
   async createEpisode(params: CreateEpisodeParams): Promise<Episode> {
     return this.post("/v1/episodes", {
-      subject_id: params.subject_id,
+      subjectId: params.subjectId,
       source: params.source,
       type: params.type,
       payload: params.payload,
@@ -83,7 +129,7 @@ export class StatewaveClient {
 
   async createEpisodesBatch(episodes: CreateEpisodeParams[]): Promise<BatchCreateResult> {
     return this.post("/v1/episodes/batch", { episodes: episodes.map(e => ({
-      subject_id: e.subject_id,
+      subjectId: e.subjectId,
       source: e.source,
       type: e.type,
       payload: e.payload,
@@ -93,12 +139,12 @@ export class StatewaveClient {
   }
 
   async compileMemories(subjectId: string): Promise<CompileResult> {
-    return this.post("/v1/memories/compile", { subject_id: subjectId });
+    return this.post("/v1/memories/compile", { subjectId });
   }
 
-  /** Submit async compilation — returns immediately with a job_id. */
+  /** Submit async compilation — returns immediately with a jobId. */
   async compileMemoriesAsync(subjectId: string): Promise<CompileJob> {
-    return this.post("/v1/memories/compile", { subject_id: subjectId, async: true });
+    return this.post("/v1/memories/compile", { subjectId, async: true });
   }
 
   /** Poll the status of an async compile job. */
@@ -118,16 +164,16 @@ export class StatewaveClient {
     const start = Date.now();
     while (Date.now() - start < timeout) {
       await new Promise(r => setTimeout(r, pollInterval));
-      const status = await this.getCompileStatus(job.job_id);
+      const status = await this.getCompileStatus(job.jobId);
       if (status.status === "completed" || status.status === "failed") {
         return status;
       }
     }
-    throw new Error(`Compile job ${job.job_id} did not complete within ${timeout}ms`);
+    throw new Error(`Compile job ${job.jobId} did not complete within ${timeout}ms`);
   }
 
   async searchMemories(params: SearchMemoriesParams): Promise<SearchResult> {
-    const qs = new URLSearchParams({ subject_id: params.subject_id });
+    const qs = new URLSearchParams({ subject_id: params.subjectId });
     if (params.kind) qs.set("kind", params.kind);
     if (params.query) qs.set("q", params.query);
     if (params.semantic) qs.set("semantic", "true");
@@ -137,25 +183,25 @@ export class StatewaveClient {
 
   async getContext(params: GetContextParams): Promise<ContextBundle> {
     return this.post("/v1/context", {
-      subject_id: params.subject_id,
+      subjectId: params.subjectId,
       task: params.task,
-      ...(params.max_tokens !== undefined && { max_tokens: params.max_tokens }),
-      ...(params.session_id !== undefined && { session_id: params.session_id }),
-      ...(params.emit_receipt !== undefined && { emit_receipt: params.emit_receipt }),
-      ...(params.query_id !== undefined && { query_id: params.query_id }),
-      ...(params.task_id !== undefined && { task_id: params.task_id }),
-      ...(params.parent_receipt_id !== undefined && {
-        parent_receipt_id: params.parent_receipt_id,
+      ...(params.maxTokens !== undefined && { maxTokens: params.maxTokens }),
+      ...(params.sessionId !== undefined && { sessionId: params.sessionId }),
+      ...(params.emitReceipt !== undefined && { emitReceipt: params.emitReceipt }),
+      ...(params.queryId !== undefined && { queryId: params.queryId }),
+      ...(params.taskId !== undefined && { taskId: params.taskId }),
+      ...(params.parentReceiptId !== undefined && {
+        parentReceiptId: params.parentReceiptId,
       }),
-      ...(params.caller_id !== undefined && { caller_id: params.caller_id }),
-      ...(params.caller_type !== undefined && { caller_type: params.caller_type }),
+      ...(params.callerId !== undefined && { callerId: params.callerId }),
+      ...(params.callerType !== undefined && { callerType: params.callerType }),
     });
   }
 
   // -- Memory labels (#50) ----------------------------------------------
 
   /**
-   * Replace a memory's sensitivity_labels. Server normalizes
+   * Replace a memory's sensitivityLabels. Server normalizes
    * (dedup + lowercase + trim) and caps at 32 entries. Empty array
    * clears all labels — the memory becomes untagged and any policy
    * rule that depends on a label match falls through to default-allow.
@@ -163,15 +209,15 @@ export class StatewaveClient {
   async setMemoryLabels(params: SetMemoryLabelsParams): Promise<Memory> {
     return this.request(
       "PATCH",
-      `/v1/memories/${encodeURIComponent(params.memory_id)}/labels`,
-      { sensitivity_labels: params.sensitivity_labels },
+      `/v1/memories/${encodeURIComponent(params.memoryId)}/labels`,
+      { sensitivityLabels: params.sensitivityLabels },
     );
   }
 
   /** Return just the assembled context string, ready to inject into a prompt. */
   async getContextString(params: GetContextParams): Promise<string> {
     const bundle = await this.getContext(params);
-    return bundle.assembled_context;
+    return bundle.assembledContext;
   }
 
   // -- Receipts --------------------------------------------------------
@@ -183,11 +229,11 @@ export class StatewaveClient {
 
   /**
    * List state-assembly receipts for a subject, newest first.
-   * Cursor-paginated — pass back the previous response's `next_cursor`
+   * Cursor-paginated — pass back the previous response's `nextCursor`
    * to fetch the next page.
    */
   async listReceipts(params: ListReceiptsParams): Promise<ReceiptList> {
-    const qs = new URLSearchParams({ subject_id: params.subject_id });
+    const qs = new URLSearchParams({ subject_id: params.subjectId });
     if (params.since !== undefined) qs.set("since", params.since);
     if (params.until !== undefined) qs.set("until", params.until);
     if (params.cursor !== undefined) qs.set("cursor", params.cursor);
@@ -223,16 +269,17 @@ export class StatewaveClient {
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
     let lastError: Error | undefined;
+    const wireBody = body === undefined ? undefined : toWire(body);
 
     for (let attempt = 0; attempt <= this.retryConfig.maxRetries; attempt++) {
       let resp: Response;
       try {
         const headers: Record<string, string> = { ...this.defaultHeaders };
-        if (body) headers["Content-Type"] = "application/json";
+        if (wireBody !== undefined) headers["Content-Type"] = "application/json";
         resp = await fetch(`${this.baseUrl}${path}`, {
           method,
           headers,
-          body: body ? JSON.stringify(body) : undefined,
+          body: wireBody !== undefined ? JSON.stringify(wireBody) : undefined,
         });
       } catch (err) {
         // Network/connection error — retryable
@@ -245,7 +292,7 @@ export class StatewaveClient {
       }
 
       if (resp.ok) {
-        return resp.json() as Promise<T>;
+        return fromWire<T>(await resp.json());
       }
 
       // Check if retryable status

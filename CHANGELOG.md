@@ -1,5 +1,89 @@
 # Changelog
 
+## 0.9.0 (2026-05-16)
+
+### Breaking — SDK surface is now camelCase (#103)
+
+The TypeScript SDK previously mixed conventions: the client constructor
+options were camelCase (`baseUrl`, `apiKey`, `tenantId`) while every
+request param and response field was snake_case (`subject_id`,
+`max_tokens`, `created_at`, …). That inconsistency is fixed — the
+**entire public surface is now idiomatic camelCase**.
+
+- The Statewave HTTP API contract is **unchanged**. The client maps
+  camelCase ⇄ the server's snake_case transparently in both directions,
+  so no server upgrade is required and any server version still works.
+- The free-form `payload`, `metadata`, and `provenance` bags are passed
+  through **verbatim** — their inner keys are never rewritten, so
+  arbitrary caller data round-trips byte-for-byte.
+- This is a deliberate pre-1.0 breaking release. It is a **minor** bump
+  (not a patch) so `^0.x` ranges do not silently auto-upgrade.
+
+**Migration** — rename keys at every call site and on every response
+you read. The renames are mechanical (snake_case → camelCase):
+
+| Before (snake_case)        | After (camelCase)         |
+| -------------------------- | ------------------------- |
+| `subject_id`               | `subjectId`               |
+| `max_tokens`               | `maxTokens`               |
+| `session_id`               | `sessionId`               |
+| `memory_id`                | `memoryId`                |
+| `sensitivity_labels`       | `sensitivityLabels`       |
+| `emit_receipt`             | `emitReceipt`             |
+| `query_id`                 | `queryId`                 |
+| `task_id`                  | `taskId`                  |
+| `parent_receipt_id`        | `parentReceiptId`         |
+| `caller_id`                | `callerId`                |
+| `caller_type`              | `callerType`              |
+| `created_at`               | `createdAt`               |
+| `updated_at`               | `updatedAt`               |
+| `valid_from`               | `validFrom`               |
+| `valid_to`                 | `validTo`                 |
+| `source_episode_ids`       | `sourceEpisodeIds`        |
+| `memories_created`         | `memoriesCreated`         |
+| `episodes_created`         | `episodesCreated`         |
+| `episode_count`            | `episodeCount`            |
+| `memory_count`             | `memoryCount`             |
+| `episodes_deleted`         | `episodesDeleted`         |
+| `memories_deleted`         | `memoriesDeleted`         |
+| `job_id`                   | `jobId`                   |
+| `assembled_context`        | `assembledContext`        |
+| `token_estimate`           | `tokenEstimate`           |
+| `receipt_id`               | `receiptId`               |
+| `receipt_emitted`          | `receiptEmitted`          |
+| `next_cursor`              | `nextCursor`              |
+| `selected_entries`         | `selectedEntries`         |
+| `context_hash`             | `contextHash`             |
+| `context_size_bytes`       | `contextSizeBytes`        |
+| `canonicalization_version` | `canonicalizationVersion` |
+| `policy_bundle_hash`       | `policyBundleHash`        |
+| `filters_applied`          | `filtersApplied`          |
+| `filters_skipped`          | `filtersSkipped`          |
+| `receipt_signature`        | `receiptSignature`        |
+| `tenant_id`                | `tenantId`                |
+| `as_of`                    | `asOf`                    |
+| `event_type`               | `eventType`               |
+| `occurred_at`              | `occurredAt`              |
+| `provenance_hash`          | `provenanceHash`          |
+| `fact_key`                 | `factKey`                 |
+| `conflict_status`          | `conflictStatus`          |
+| `supersession_status`      | `supersessionStatus`      |
+| `episode_id`               | `episodeId`               |
+
+```diff
+- await sw.createEpisode({ subject_id: "user-42", source: "crm", type: "note", payload: {...} });
++ await sw.createEpisode({ subjectId: "user-42", source: "crm", type: "note", payload: {...} });
+
+- const ctx = await sw.getContext({ subject_id: "user-42", task: "...", max_tokens: 300 });
+- console.log(ctx.assembled_context);
++ const ctx = await sw.getContext({ subjectId: "user-42", task: "...", maxTokens: 300 });
++ console.log(ctx.assembledContext);
+```
+
+> Note: the Python SDK (`statewave`) intentionally stays snake_case —
+> that is idiomatic Python. Each SDK follows its language's convention;
+> the wire contract is the shared snake_case interface underneath.
+
 ## 0.8.0 (2026-05-14)
 
 ### Added — governance & audit surface
