@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.10.0 (2026-05-21)
+
+### Added — support-agent SDK methods
+
+Ergonomic wrappers for the support-agent endpoints (server v0.6+), so the support wedge no longer needs raw HTTP calls alongside the SDK:
+
+- `getHealth(subjectId) -> Health` — customer health score (0–100) with the explainable factors behind it.
+- `getSLA({ subjectId, firstResponseThresholdMinutes?, resolutionThresholdHours? }) -> SLASummary` — first-response / resolution times and breach counts, aggregated across the subject's sessions. Thresholds fall back to the server defaults (5 min / 24 h).
+- `createResolution({ subjectId, sessionId, status?, resolutionSummary?, metadata? }) -> Resolution` — create or update a resolution record; upserts by `subjectId` + `sessionId`.
+- `listResolutions({ subjectId, status? }) -> Resolution[]` — list resolution records for a subject, optionally filtered by status.
+- `createHandoff({ subjectId, sessionId, reason?, maxTokens?, ... }) -> Handoff` — generate a structured escalation brief. Shares `getContext`'s caller-identity gate (`callerId` / `callerType`).
+
+New response types: `Health`, `HealthFactor`, `SLASummary`, `SessionSLA`, `Handoff`, `ResolutionSummaryItem`, `Resolution`. New param types: `GetSLAParams`, `CreateHandoffParams`, `CreateResolutionParams`, `ListResolutionsParams`. New string-literal unions: `HealthState`, `ResolutionStatus`.
+
+### Notes
+
+- Purely additive — no existing method, type, or behaviour changes. The HTTP wire contract is unchanged; these methods wrap endpoints the server has exposed since v0.6.
+- camelCase ⇄ snake_case mapping, auth, tenant-scoping, and retry behaviour are inherited from the shared request path. `provenance` (on `Handoff`) and `metadata` (on `Resolution`) are passed through verbatim like every other opaque bag.
+
 ## 0.9.0 (2026-05-16)
 
 ### Breaking — SDK surface is now camelCase (#103)

@@ -5,15 +5,23 @@ import type {
   CompileResult,
   ContextBundle,
   CreateEpisodeParams,
+  CreateHandoffParams,
+  CreateResolutionParams,
   DeleteResult,
   Episode,
   GetContextParams,
+  GetSLAParams,
+  Handoff,
+  Health,
   ListReceiptsParams,
+  ListResolutionsParams,
   ListSubjectsResult,
   Memory,
   Receipt,
   ReceiptList,
+  Resolution,
   RetryConfig,
+  SLASummary,
   SearchMemoriesParams,
   SearchResult,
   SetMemoryLabelsParams,
@@ -239,6 +247,88 @@ export class StatewaveClient {
     if (params.cursor !== undefined) qs.set("cursor", params.cursor);
     if (params.limit !== undefined) qs.set("limit", String(params.limit));
     return this.get(`/v1/receipts?${qs}`);
+  }
+
+  // -- Support: health, SLA, handoff, resolutions ----------------------
+
+  /**
+   * Compute the customer health score (0–100) for a subject, with the
+   * explainable factors that drove it. Backs proactive risk triage.
+   */
+  async getHealth(subjectId: string): Promise<Health> {
+    return this.get(`/v1/subjects/${encodeURIComponent(subjectId)}/health`);
+  }
+
+  /**
+   * Compute SLA metrics for a subject — first-response and resolution
+   * times plus breach flags, aggregated across the subject's sessions.
+   * Both thresholds fall back to the server defaults (5 minutes /
+   * 24 hours) when omitted.
+   */
+  async getSLA(params: GetSLAParams): Promise<SLASummary> {
+    const qs = new URLSearchParams();
+    if (params.firstResponseThresholdMinutes !== undefined) {
+      qs.set(
+        "first_response_threshold_minutes",
+        String(params.firstResponseThresholdMinutes),
+      );
+    }
+    if (params.resolutionThresholdHours !== undefined) {
+      qs.set("resolution_threshold_hours", String(params.resolutionThresholdHours));
+    }
+    const query = qs.toString();
+    return this.get(
+      `/v1/subjects/${encodeURIComponent(params.subjectId)}/sla${query ? `?${query}` : ""}`,
+    );
+  }
+
+  /**
+   * Generate a handoff context pack — a structured escalation brief for
+   * shift change or agent transfer. Same caller-identity gate as
+   * `getContext`: when the tenant sets `require_caller_identity: true`,
+   * both `callerId` and `callerType` are mandatory.
+   */
+  async createHandoff(params: CreateHandoffParams): Promise<Handoff> {
+    return this.post("/v1/handoff", {
+      subjectId: params.subjectId,
+      sessionId: params.sessionId,
+      ...(params.reason !== undefined && { reason: params.reason }),
+      ...(params.maxTokens !== undefined && { maxTokens: params.maxTokens }),
+      ...(params.emitReceipt !== undefined && { emitReceipt: params.emitReceipt }),
+      ...(params.queryId !== undefined && { queryId: params.queryId }),
+      ...(params.taskId !== undefined && { taskId: params.taskId }),
+      ...(params.parentReceiptId !== undefined && {
+        parentReceiptId: params.parentReceiptId,
+      }),
+      ...(params.callerId !== undefined && { callerId: params.callerId }),
+      ...(params.callerType !== undefined && { callerType: params.callerType }),
+    });
+  }
+
+  /**
+   * Create or update a resolution record for a support session.
+   * Upserts by `subjectId` + `sessionId`.
+   */
+  async createResolution(params: CreateResolutionParams): Promise<Resolution> {
+    return this.post("/v1/resolutions", {
+      subjectId: params.subjectId,
+      sessionId: params.sessionId,
+      ...(params.status !== undefined && { status: params.status }),
+      ...(params.resolutionSummary !== undefined && {
+        resolutionSummary: params.resolutionSummary,
+      }),
+      ...(params.metadata !== undefined && { metadata: params.metadata }),
+    });
+  }
+
+  /**
+   * List resolution records for a subject, optionally filtered to a
+   * single status.
+   */
+  async listResolutions(params: ListResolutionsParams): Promise<Resolution[]> {
+    const qs = new URLSearchParams({ subject_id: params.subjectId });
+    if (params.status !== undefined) qs.set("status", params.status);
+    return this.get(`/v1/resolutions?${qs}`);
   }
 
   async getTimeline(subjectId: string): Promise<Timeline> {
