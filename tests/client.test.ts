@@ -265,6 +265,262 @@ describe("Receipts", () => {
   });
 });
 
+describe("Support endpoints", () => {
+  function jsonResponse(body: unknown) {
+    return new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  it("getHealth hits the subject health path and maps the response", async () => {
+    const mockFetch = vi.fn(async (url: string) => {
+      expect(url).toContain("/v1/subjects/customer%3Aglobex/health");
+      return jsonResponse({
+        subject_id: "customer:globex",
+        score: 72,
+        state: "watch",
+        factors: [
+          { signal: "sla_resolution_breaches", impact: -10, detail: "1 breach" },
+        ],
+      });
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const client = new StatewaveClient({ retry: false });
+    const health = await client.getHealth("customer:globex");
+    expect(health.subjectId).toBe("customer:globex");
+    expect(health.score).toBe(72);
+    expect(health.state).toBe("watch");
+    expect(health.factors[0].signal).toBe("sla_resolution_breaches");
+    expect(health.factors[0].impact).toBe(-10);
+    vi.unstubAllGlobals();
+  });
+
+  it("getSLA encodes both threshold params and maps nested sessions", async () => {
+    const mockFetch = vi.fn(async (url: string) => {
+      expect(url).toContain("/v1/subjects/u1/sla?");
+      expect(url).toContain("first_response_threshold_minutes=10");
+      expect(url).toContain("resolution_threshold_hours=48");
+      return jsonResponse({
+        subject_id: "u1",
+        total_sessions: 2,
+        resolved_sessions: 1,
+        open_sessions: 1,
+        avg_first_response_seconds: 120.0,
+        avg_resolution_seconds: 3600.0,
+        first_response_breach_count: 0,
+        resolution_breach_count: 1,
+        sessions: [
+          {
+            session_id: "s1",
+            status: "resolved",
+            first_message_at: "2026-05-01T00:00:00Z",
+            first_response_at: "2026-05-01T00:02:00Z",
+            resolved_at: "2026-05-01T01:00:00Z",
+            first_response_seconds: 120.0,
+            resolution_seconds: 3600.0,
+            open_duration_seconds: null,
+            first_response_breached: false,
+            resolution_breached: true,
+          },
+        ],
+      });
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const client = new StatewaveClient({ retry: false });
+    const sla = await client.getSLA({
+      subjectId: "u1",
+      firstResponseThresholdMinutes: 10,
+      resolutionThresholdHours: 48,
+    });
+    expect(sla.totalSessions).toBe(2);
+    expect(sla.resolutionBreachCount).toBe(1);
+    expect(sla.sessions[0].sessionId).toBe("s1");
+    expect(sla.sessions[0].firstResponseSeconds).toBe(120.0);
+    expect(sla.sessions[0].openDurationSeconds).toBeNull();
+    expect(sla.sessions[0].resolutionBreached).toBe(true);
+    vi.unstubAllGlobals();
+  });
+
+  it("getSLA omits the query string entirely when no thresholds are given", async () => {
+    const mockFetch = vi.fn(async (url: string) => {
+      expect(url).toMatch(/\/v1\/subjects\/u1\/sla$/);
+      return jsonResponse({
+        subject_id: "u1",
+        total_sessions: 0,
+        resolved_sessions: 0,
+        open_sessions: 0,
+        first_response_breach_count: 0,
+        resolution_breach_count: 0,
+        sessions: [],
+      });
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const client = new StatewaveClient({ retry: false });
+    const sla = await client.getSLA({ subjectId: "u1" });
+    expect(sla.totalSessions).toBe(0);
+    expect(sla.sessions).toEqual([]);
+    vi.unstubAllGlobals();
+  });
+
+  it("createHandoff POSTs a snake_case body and maps the brief back", async () => {
+    const mockFetch = vi.fn(async (_url: string, init?: RequestInit) => {
+      const body = JSON.parse(init?.body as string);
+      expect(body.subject_id).toBe("u1");
+      expect(body.session_id).toBe("sess-1");
+      expect(body.reason).toBe("escalation");
+      expect(body.max_tokens).toBe(500);
+      expect(body.caller_id).toBe("agent-7");
+      expect(body.caller_type).toBe("support_agent");
+      return jsonResponse({
+        subject_id: "u1",
+        session_id: "sess-1",
+        reason: "escalation",
+        generated_at: "2026-05-21T10:00:00Z",
+        customer_summary: "Enterprise customer",
+        active_issue: "Duplicate charge",
+        attempted_steps: ["checked billing"],
+        key_facts: ["plan: enterprise"],
+        resolution_history: [
+          { session_id: "s0", status: "resolved", summary: "refund", resolved_at: "2026-05-01T00:00:00Z" },
+        ],
+        recent_context: ["asked about refund"],
+        health_score: 60,
+        health_state: "watch",
+        health_factors: [{ signal: "open_sessions", impact: -5, detail: "1 open" }],
+        handoff_notes: "# Handoff Brief",
+        token_estimate: 180,
+        provenance: { fact_ids: ["f1"], episode_ids: ["e1"] },
+        receipt_id: null,
+        receipt_emitted: false,
+      });
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const client = new StatewaveClient({ retry: false });
+    const handoff = await client.createHandoff({
+      subjectId: "u1",
+      sessionId: "sess-1",
+      reason: "escalation",
+      maxTokens: 500,
+      callerId: "agent-7",
+      callerType: "support_agent",
+    });
+    expect(handoff.customerSummary).toBe("Enterprise customer");
+    expect(handoff.attemptedSteps).toEqual(["checked billing"]);
+    expect(handoff.resolutionHistory[0].sessionId).toBe("s0");
+    expect(handoff.healthFactors[0].signal).toBe("open_sessions");
+    expect(handoff.handoffNotes).toBe("# Handoff Brief");
+    // `provenance` is an opaque bag — inner keys stay verbatim snake_case.
+    expect(handoff.provenance.fact_ids).toEqual(["f1"]);
+    vi.unstubAllGlobals();
+  });
+
+  it("createResolution POSTs the body and maps the record back", async () => {
+    const mockFetch = vi.fn(async (url: string, init?: RequestInit) => {
+      expect(url).toContain("/v1/resolutions");
+      expect(init?.method).toBe("POST");
+      const body = JSON.parse(init?.body as string);
+      expect(body.subject_id).toBe("u1");
+      expect(body.session_id).toBe("sess-1");
+      expect(body.status).toBe("resolved");
+      expect(body.resolution_summary).toBe("Issued refund");
+      // `metadata` is an opaque bag — inner keys are NOT rewritten.
+      expect(body.metadata).toEqual({ refund_id: "r-9" });
+      return jsonResponse({
+        id: "00000000-0000-0000-0000-000000000001",
+        subject_id: "u1",
+        session_id: "sess-1",
+        status: "resolved",
+        resolution_summary: "Issued refund",
+        resolved_at: "2026-05-21T10:00:00Z",
+        metadata: { refund_id: "r-9" },
+        created_at: "2026-05-21T09:00:00Z",
+        updated_at: "2026-05-21T10:00:00Z",
+      });
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const client = new StatewaveClient({ retry: false });
+    const resolution = await client.createResolution({
+      subjectId: "u1",
+      sessionId: "sess-1",
+      status: "resolved",
+      resolutionSummary: "Issued refund",
+      metadata: { refund_id: "r-9" },
+    });
+    expect(resolution.status).toBe("resolved");
+    expect(resolution.resolutionSummary).toBe("Issued refund");
+    expect(resolution.metadata.refund_id).toBe("r-9");
+    vi.unstubAllGlobals();
+  });
+
+  it("listResolutions encodes subject_id + status and parses the array", async () => {
+    const mockFetch = vi.fn(async (url: string) => {
+      expect(url).toContain("subject_id=u1");
+      expect(url).toContain("status=open");
+      return jsonResponse([
+        {
+          id: "00000000-0000-0000-0000-000000000002",
+          subject_id: "u1",
+          session_id: "sess-2",
+          status: "open",
+          resolution_summary: null,
+          resolved_at: null,
+          metadata: {},
+          created_at: "2026-05-21T09:00:00Z",
+          updated_at: "2026-05-21T09:00:00Z",
+        },
+      ]);
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const client = new StatewaveClient({ retry: false });
+    const resolutions = await client.listResolutions({ subjectId: "u1", status: "open" });
+    expect(resolutions).toHaveLength(1);
+    expect(resolutions[0].sessionId).toBe("sess-2");
+    expect(resolutions[0].status).toBe("open");
+    expect(resolutions[0].resolvedAt).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  it("getHealth surfaces a 404 as a StatewaveAPIError", async () => {
+    const mockFetch = vi.fn(async () =>
+      new Response(
+        JSON.stringify({ error: { code: "not_found", message: "unknown subject" } }),
+        { status: 404, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", mockFetch);
+
+    const client = new StatewaveClient({ retry: false });
+    await expect(client.getHealth("ghost")).rejects.toThrow(StatewaveAPIError);
+    vi.unstubAllGlobals();
+  });
+
+  it("createHandoff surfaces a 401 (caller identity required) as a StatewaveAPIError", async () => {
+    const mockFetch = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          error: { code: "unauthorized", message: "caller_id and caller_type required" },
+        }),
+        { status: 401, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", mockFetch);
+
+    const client = new StatewaveClient({ retry: false });
+    await expect(
+      client.createHandoff({ subjectId: "u1", sessionId: "sess-1" }),
+    ).rejects.toThrow(StatewaveAPIError);
+    expect(mockFetch).toHaveBeenCalledTimes(1); // 401 is not retried
+    vi.unstubAllGlobals();
+  });
+});
+
 describe("Retry behavior", () => {
   it("can be configured with retry options", () => {
     const client = new StatewaveClient({ retry: { maxRetries: 5, backoffBase: 100 } });

@@ -151,6 +151,59 @@ console.log(updated.sensitivityLabels); // → ["financial", "pii"]
 
 Receipts and the policy engine cooperate: every assembly call records its policy decisions into `receipt.policy.filtersApplied` (one entry per memory the policy fired on) and `receipt.policy.filtersSkipped` (per-rule summary of what didn't fire). In `log_only` mode (the tenant default) the receipt is the full audit trail without filtering; under `enforce` denied memories are dropped before they reach the assembly and the deny is still recorded. See [`receipts.md`](https://github.com/smaramwbc/statewave-docs/blob/main/receipts.md) and [`sensitivity-labels.md`](https://github.com/smaramwbc/statewave-docs/blob/main/sensitivity-labels.md) for the full schemas and policy YAML format.
 
+## Support-agent endpoints
+
+Statewave's support wedge — customer health scoring, SLA tracking, resolution state, and structured escalation briefs — is exposed through ergonomic SDK methods (server v0.6+).
+
+```typescript
+import { StatewaveClient } from "@statewavedev/sdk";
+
+const sw = new StatewaveClient("http://localhost:8100");
+
+// Customer health score (0–100) with the explainable factors behind it.
+const health = await sw.getHealth("customer:globex");
+console.log(`${health.score}/100 — ${health.state}`);
+for (const f of health.factors) {
+  console.log(`  ${f.signal}: ${f.impact >= 0 ? "+" : ""}${f.impact} (${f.detail})`);
+}
+
+// SLA metrics — first-response / resolution times and breach counts.
+// Thresholds are optional; they default server-side to 5 min / 24 h.
+const sla = await sw.getSLA({
+  subjectId: "customer:globex",
+  firstResponseThresholdMinutes: 10,
+  resolutionThresholdHours: 48,
+});
+console.log(`${sla.resolvedSessions}/${sla.totalSessions} resolved, ${sla.resolutionBreachCount} SLA breaches`);
+
+// Track resolution state for a session (upserts by subject + session).
+await sw.createResolution({
+  subjectId: "customer:globex",
+  sessionId: "ticket-8842",
+  status: "resolved",
+  resolutionSummary: "Issued refund for the duplicate charge",
+});
+
+// List resolutions, optionally filtered by status.
+const openItems = await sw.listResolutions({
+  subjectId: "customer:globex",
+  status: "open",
+});
+
+// Generate a handoff context pack for escalation or shift change.
+// `handoffNotes` is a pre-rendered markdown brief for human or LLM use.
+const handoff = await sw.createHandoff({
+  subjectId: "customer:globex",
+  sessionId: "ticket-8842",
+  reason: "escalation",
+  callerId: "agent-7",
+  callerType: "support_agent",
+});
+console.log(handoff.handoffNotes);
+```
+
+`getHealth`, `getSLA`, `createResolution`, `listResolutions`, and `createHandoff` respect the same auth, tenant-scoping, and retry behaviour as the rest of the client. `createHandoff` shares `getContext`'s caller-identity gate — when the tenant config sets `require_caller_identity: true`, both `callerId` and `callerType` are mandatory.
+
 ## Error handling
 
 ```typescript
@@ -195,8 +248,13 @@ All response types are fully typed:
 - `ListSubjectsResult` — paginated subject listing
 - `Receipt` + `ReceiptSelectedEntry` + `ReceiptPolicy` + `ReceiptOutput` — state-assembly audit artifact (v0.8) and its nested shapes
 - `ReceiptList` — cursor-paginated receipt listing
+- `Health` + `HealthFactor` — customer health score and its explainable factors
+- `SLASummary` + `SessionSLA` — SLA metrics, aggregate and per-session
+- `Handoff` + `ResolutionSummaryItem` — handoff context pack and its prior-resolution items
+- `Resolution` — resolution tracking record
+- `HealthState` / `ResolutionStatus` — string-literal status unions
 
-Param types: `CreateEpisodeParams`, `SearchMemoriesParams`, `GetContextParams`, `ListReceiptsParams`, `SetMemoryLabelsParams`
+Param types: `CreateEpisodeParams`, `SearchMemoriesParams`, `GetContextParams`, `ListReceiptsParams`, `SetMemoryLabelsParams`, `GetSLAParams`, `CreateHandoffParams`, `CreateResolutionParams`, `ListResolutionsParams`
 
 ## Running tests
 

@@ -184,6 +184,106 @@ export interface CompileJob {
   error?: string;
 }
 
+// -- Support: health, SLA, handoff, resolutions ----------------------
+
+/** Support health-state bucket. */
+export type HealthState = "healthy" | "watch" | "at_risk";
+
+/** Resolution lifecycle status. */
+export type ResolutionStatus = "open" | "resolved" | "unresolved";
+
+/** One explainable factor behind a customer health score. */
+export interface HealthFactor {
+  /** Stable signal identifier, e.g. `sla_resolution_breaches`. */
+  signal: string;
+  /** Signed score contribution — a negative impact drags the score down. */
+  impact: number;
+  /** Human-readable explanation of the factor. */
+  detail: string;
+}
+
+/** Customer health score (0–100) with the factors that drove it. */
+export interface Health {
+  subjectId: string;
+  score: number;
+  state: HealthState;
+  factors: HealthFactor[];
+}
+
+/** SLA metrics for a single support session. */
+export interface SessionSLA {
+  sessionId: string;
+  /** `resolved` | `open`. */
+  status: string;
+  firstMessageAt: string | null;
+  firstResponseAt: string | null;
+  resolvedAt: string | null;
+  firstResponseSeconds: number | null;
+  resolutionSeconds: number | null;
+  openDurationSeconds: number | null;
+  firstResponseBreached: boolean;
+  resolutionBreached: boolean;
+}
+
+/** Aggregate SLA metrics for a subject across all of its sessions. */
+export interface SLASummary {
+  subjectId: string;
+  totalSessions: number;
+  resolvedSessions: number;
+  openSessions: number;
+  avgFirstResponseSeconds: number | null;
+  avgResolutionSeconds: number | null;
+  firstResponseBreachCount: number;
+  resolutionBreachCount: number;
+  sessions: SessionSLA[];
+}
+
+/** A prior resolution surfaced inside a handoff brief. */
+export interface ResolutionSummaryItem {
+  sessionId: string;
+  status: string;
+  summary: string | null;
+  resolvedAt: string | null;
+}
+
+/** Structured escalation brief — the handoff context pack. */
+export interface Handoff {
+  subjectId: string;
+  sessionId: string;
+  reason: string;
+  generatedAt: string;
+  customerSummary: string;
+  activeIssue: string;
+  attemptedSteps: string[];
+  keyFacts: string[];
+  resolutionHistory: ResolutionSummaryItem[];
+  recentContext: string[];
+  healthScore: number | null;
+  healthState: HealthState | null;
+  healthFactors: HealthFactor[];
+  /** Pre-rendered markdown brief, ready for human or LLM consumption. */
+  handoffNotes: string;
+  tokenEstimate: number;
+  provenance: Record<string, unknown>;
+  /** ULID of the state-assembly receipt, when one was emitted. */
+  receiptId?: string | null;
+  /** True iff a receipt was successfully written for this call. */
+  receiptEmitted?: boolean;
+}
+
+/** Resolution tracking record for a support session. */
+export interface Resolution {
+  id: string;
+  subjectId: string;
+  sessionId: string;
+  status: ResolutionStatus;
+  resolutionSummary: string | null;
+  resolvedAt: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CreateEpisodeParams {
   subjectId: string;
   source: string;
@@ -233,6 +333,57 @@ export interface SetMemoryLabelsParams {
    * trim) and caps at 32 entries. Empty list clears all labels.
    */
   sensitivityLabels: string[];
+}
+
+export interface GetSLAParams {
+  subjectId: string;
+  /** First-response SLA threshold in minutes (server default: 5). */
+  firstResponseThresholdMinutes?: number;
+  /** Resolution SLA threshold in hours (server default: 24). */
+  resolutionThresholdHours?: number;
+}
+
+export interface CreateHandoffParams {
+  subjectId: string;
+  /** Session being handed off. */
+  sessionId: string;
+  /** Why the handoff is happening (server default: "escalation"). */
+  reason?: string;
+  /** Token budget for the assembled brief. */
+  maxTokens?: number;
+  /**
+   * Opt in to emitting a state-assembly receipt for this call. The
+   * tenant config can also force emission on or off independently of
+   * this flag.
+   */
+  emitReceipt?: boolean;
+  queryId?: string;
+  taskId?: string;
+  parentReceiptId?: string;
+  /**
+   * Caller identity consumed by the sensitivity-label policy layer
+   * (#50). When the tenant config sets `require_caller_identity: true`,
+   * both `callerId` and `callerType` are mandatory.
+   */
+  callerId?: string;
+  callerType?: string;
+}
+
+export interface CreateResolutionParams {
+  subjectId: string;
+  sessionId: string;
+  /** Lifecycle status (server default: "open"). */
+  status?: ResolutionStatus;
+  /** Short human summary of how the session was resolved. */
+  resolutionSummary?: string;
+  /** Free-form caller-owned bag; inner keys round-trip verbatim. */
+  metadata?: Record<string, unknown>;
+}
+
+export interface ListResolutionsParams {
+  subjectId: string;
+  /** Filter to a single status. Omit to list every resolution. */
+  status?: ResolutionStatus;
 }
 
 export interface ClientOptions {
