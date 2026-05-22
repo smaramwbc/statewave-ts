@@ -12,6 +12,12 @@ Official TypeScript SDK for [Statewave](https://github.com/smaramwbc/statewave) 
 
 > ⚠️ **v0.9.0 is a breaking change.** The entire SDK surface — request params *and* response fields — is now idiomatic **camelCase** (`subjectId`, `maxTokens`, `createdAt`, `receiptId`, …). The wire protocol is unchanged; the client maps to/from the server's snake_case transparently. `payload`, `metadata`, and `provenance` are passed through verbatim — their inner keys are never rewritten. See [CHANGELOG](CHANGELOG.md#090) for the full rename table and migration steps.
 
+> **New to Statewave?** This SDK is a thin client for a running **Statewave
+> server**. If you don't have one yet, the
+> [Getting Started guide](https://github.com/smaramwbc/statewave-docs/blob/main/getting-started.md)
+> brings one up with Docker Compose in about 5 minutes. Every example below
+> assumes a server reachable at `http://localhost:8100`.
+
 ## Install
 
 ```bash
