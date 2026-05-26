@@ -19,6 +19,8 @@ import type {
   Memory,
   Receipt,
   ReceiptList,
+  ReceiptReplayResult,
+  ReceiptVerifyResult,
   Resolution,
   RetryConfig,
   SLASummary,
@@ -26,6 +28,7 @@ import type {
   SearchResult,
   SetMemoryLabelsParams,
   Timeline,
+  UnreplayableReason,
 } from "./types.js";
 
 /**
@@ -96,6 +99,50 @@ export class StatewaveConnectionError extends Error {
   constructor(message = "Cannot connect to Statewave server") {
     super(message);
     this.name = "StatewaveConnectionError";
+  }
+}
+
+/** The documented refusal vocabulary for the v0.9 replay endpoint.
+ *  Mirrors the `UnreplayableReason` type alias in `./types.ts`.
+ *  Auto-promotion to `StatewaveUnreplayableError` only happens when
+ *  the server returns a code with one of these reasons — a future
+ *  unknown reason stays on the generic `StatewaveAPIError` path. */
+const UNREPLAYABLE_REASONS: ReadonlySet<string> = new Set([
+  "missing_policy_snapshot",
+  "nested_replay",
+  "invalid_snapshot",
+]);
+
+/**
+ * Raised by `replayReceipt(...)` when the server refuses with HTTP 422.
+ * Subclass of `StatewaveAPIError` so generic handlers still catch it;
+ * adds a typed `reason` field so callers can branch on the structured
+ * refusal vocabulary without parsing the error code.
+ *
+ * `reason` is a discriminated union of:
+ * - `"missing_policy_snapshot"` — pre-v0.9 receipt. No
+ *   `policySnapshot` was captured at emission and the replay engine
+ *   cannot synthesise one retroactively.
+ * - `"nested_replay"` — the receipt is itself a replay
+ *   (`mode === "as_of_replay"`). v0.9 ships one level only; replay
+ *   the source receipt referenced by `parentReceiptId` instead.
+ * - `"invalid_snapshot"` — the snapshot's YAML failed to parse.
+ *   Tampering or corruption at the column level.
+ */
+export class StatewaveUnreplayableError extends StatewaveAPIError {
+  readonly reason: UnreplayableReason;
+
+  constructor(
+    reason: UnreplayableReason,
+    statusCode: number,
+    code: string,
+    message: string,
+    details?: unknown,
+    requestId?: string,
+  ) {
+    super(statusCode, code, message, details, requestId);
+    this.name = "StatewaveUnreplayableError";
+    this.reason = reason;
   }
 }
 
@@ -247,6 +294,58 @@ export class StatewaveClient {
     if (params.cursor !== undefined) qs.set("cursor", params.cursor);
     if (params.limit !== undefined) qs.set("limit", String(params.limit));
     return this.get(`/v1/receipts?${qs}`);
+  }
+
+  /**
+   * Verify the HMAC signature on a stored receipt (v0.9+ #157).
+   *
+   * Returns a `ReceiptVerifyResult` with `valid` ∈ `{true, false, null}`:
+   * - `true` — signature matches the canonical body (`reason === "ok"`).
+   * - `false` — signature does not cover the body
+   *   (`reason === "signature_mismatch"`).
+   * - `null` — verdict could not be determined; `reason` is one of
+   *   `"no_signature"` (unsigned receipt — pre-v0.9 or tenant didn't
+   *   opt in), `"key_unavailable"` (the keyId rotated out of operator
+   *   config), or `"unsupported_algorithm"` (forward-compat).
+   *
+   * Comparison is constant-time on the server side. The signing key
+   * bytes never appear on the response — only the public `keyId` is
+   * echoed.
+   *
+   * Throws `StatewaveAPIError` on 404 (receipt not found or belongs to
+   * a different tenant — indistinguishable on the wire) and other
+   * non-2xx responses.
+   */
+  async verifyReceipt(receiptId: string): Promise<ReceiptVerifyResult> {
+    return this.get(`/v1/receipts/${encodeURIComponent(receiptId)}/verify`);
+  }
+
+  /**
+   * Re-run the original retrieval against current memories using the
+   * original policy bundle captured in the receipt's `policySnapshot`
+   * (v0.9+ #159).
+   *
+   * Emits a new `mode="as_of_replay"` receipt with `parentReceiptId`
+   * pointing at the source; the original receipt is **never**
+   * modified. Returns the new `replayReceiptId` plus a structural
+   * diff envelope (added/removed selected entries, filter changes,
+   * context-hash diff).
+   *
+   * Semantic: current code + original policy. Replay is *not*
+   * byte-for-byte reproduction; memories that were added, tombstoned,
+   * or supersession-resolved between the original emission and now
+   * will appear in the diff. See `docs/replay.md` in the server repo
+   * for the design rationale.
+   *
+   * Throws `StatewaveUnreplayableError` (HTTP 422) when:
+   * - `reason === "missing_policy_snapshot"` — pre-v0.9 receipt.
+   * - `reason === "nested_replay"` — the receipt is itself a replay.
+   * - `reason === "invalid_snapshot"` — snapshot YAML failed to parse.
+   *
+   * Throws `StatewaveAPIError` on 404 and other non-2xx responses.
+   */
+  async replayReceipt(receiptId: string): Promise<ReceiptReplayResult> {
+    return this.post(`/v1/receipts/${encodeURIComponent(receiptId)}/replay`, undefined);
   }
 
   // -- Support: health, SLA, handoff, resolutions ----------------------
@@ -427,6 +526,24 @@ export class StatewaveClient {
       const body = await resp.json();
       const err = body?.error;
       if (err && typeof err.code === "string") {
+        // Promote unreplayable.<reason> refusals into a typed
+        // exception so callers can `catch (e) { if (e instanceof
+        // StatewaveUnreplayableError) ... e.reason }` without
+        // string-matching the error code. Forward-compat: an
+        // unrecognised future reason stays on the generic path.
+        if (resp.status === 422 && err.code.startsWith("unreplayable.")) {
+          const reason = err.code.slice("unreplayable.".length);
+          if (UNREPLAYABLE_REASONS.has(reason)) {
+            throw new StatewaveUnreplayableError(
+              reason as UnreplayableReason,
+              resp.status,
+              err.code,
+              err.message ?? resp.statusText,
+              err.details,
+              err.request_id,
+            );
+          }
+        }
         throw new StatewaveAPIError(
           resp.status,
           err.code,

@@ -97,9 +97,9 @@ console.log(`${timeline.episodes.length} episodes, ${timeline.memories.length} m
 await sw.deleteSubject("user-42");
 ```
 
-## Governance & audit (v0.8)
+## Governance & audit (v0.8+)
 
-The SDK surfaces the [state-assembly receipts](https://github.com/smaramwbc/statewave-docs/blob/main/receipts.md) and [sensitivity-labels / policy](https://github.com/smaramwbc/statewave-docs/blob/main/sensitivity-labels.md) layer added in server v0.8.
+The SDK surfaces the [state-assembly receipts](https://github.com/smaramwbc/statewave-docs/blob/main/receipts.md) and [sensitivity-labels / policy](https://github.com/smaramwbc/statewave-docs/blob/main/sensitivity-labels.md) layer added in server v0.8, plus the v0.9 [HMAC signing](https://github.com/smaramwbc/statewave/blob/main/docs/state-assembly-receipts.md) and [as-of replay](https://github.com/smaramwbc/statewave/blob/main/docs/replay.md) surfaces.
 
 ```typescript
 import { StatewaveClient } from "@statewavedev/sdk";
@@ -138,6 +138,39 @@ const { receipts, nextCursor } = await sw.listReceipts({
 });
 for (const r of receipts) {
   console.log(r.receiptId, r.task);
+}
+
+// Verify the HMAC signature on a stored receipt (v0.9+).
+// `valid` is true | false | null — see ReceiptVerifyResult for the
+// full reason vocabulary (no_signature / key_unavailable / etc.).
+if (bundle.receiptId) {
+  const verdict = await sw.verifyReceipt(bundle.receiptId);
+  if (verdict.valid === true) {
+    console.log(`signature OK — signed by ${verdict.keyId}`);
+  } else if (verdict.valid === false) {
+    console.log("signature mismatch — body may have been tampered with");
+  } else {
+    console.log(`verdict undetermined: ${verdict.reason}`);
+  }
+}
+
+// Replay the receipt against current memories using the original
+// policy bundle captured on the receipt (v0.9+). Returns a diff
+// envelope showing what changed since emission. Pre-v0.9 receipts
+// throw StatewaveUnreplayableError with reason="missing_policy_snapshot".
+import { StatewaveUnreplayableError } from "@statewavedev/sdk";
+try {
+  const replay = await sw.replayReceipt(bundle.receiptId!);
+  if (replay.diff.contextHash.changed) {
+    console.log(`replay differs from original: new id ${replay.replayReceiptId}`);
+  }
+} catch (err) {
+  if (err instanceof StatewaveUnreplayableError) {
+    // err.reason ∈ {"missing_policy_snapshot", "nested_replay", "invalid_snapshot"}
+    console.log(`replay refused: ${err.reason}`);
+  } else {
+    throw err;
+  }
 }
 
 // Set per-memory sensitivity labels (server normalizes — dedup, lowercase, trim).
@@ -246,7 +279,10 @@ All response types are fully typed:
 - `BatchCreateResult` — batch ingestion response
 - `SubjectSummary` — subject with episode/memory counts
 - `ListSubjectsResult` — paginated subject listing
-- `Receipt` + `ReceiptSelectedEntry` + `ReceiptPolicy` + `ReceiptOutput` — state-assembly audit artifact (v0.8) and its nested shapes
+- `Receipt` + `ReceiptSelectedEntry` + `ReceiptPolicy` + `ReceiptOutput` — state-assembly audit artifact (v0.8+) and its nested shapes; v0.9 added HMAC signature fields (`receiptSignatureKeyId`, `receiptSignatureAlgorithm`), `policySnapshot` for replay, and `region` for residency
+- `ReceiptVerifyResult` — `valid` (true | false | null) + `keyId` + `algorithm` + `reason` for the v0.9 HMAC verify endpoint
+- `ReceiptReplayResult` / `ReceiptReplayDiff` — original + replay receipt ids plus the structural diff envelope from `POST /v1/receipts/{id}/replay` (v0.9)
+- `StatewaveUnreplayableError` — thrown by `replayReceipt(...)` on HTTP 422; `.reason` is a discriminated union of `"missing_policy_snapshot" | "nested_replay" | "invalid_snapshot"`
 - `ReceiptList` — cursor-paginated receipt listing
 - `Health` + `HealthFactor` — customer health score and its explainable factors
 - `SLASummary` + `SessionSLA` — SLA metrics, aggregate and per-session

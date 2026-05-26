@@ -111,13 +111,38 @@ export interface ReceiptOutput {
 }
 
 /**
+ * v0.9 (#159) — self-contained policy bundle envelope embedded on
+ * every v0.9+ receipt. Self-sufficient: the replay engine evaluates
+ * against this bundle even if the live `policy_bundles` row has
+ * since been deleted or overwritten.
+ *
+ * - A null inner pair (`bundleHash` AND `bundleYaml` both null)
+ *   records "no policy bundle was active at emission" — a valid,
+ *   replayable state.
+ * - The whole envelope being absent (`Receipt.policySnapshot ===
+ *   undefined`) marks "pre-v0.9 receipt, no snapshot was ever
+ *   captured" — the replay endpoint refuses those.
+ */
+export interface PolicySnapshot {
+  bundleHash: string | null;
+  bundleYaml: string | null;
+  /** ISO-8601 UTC timestamp captured at receipt emission. */
+  capturedAt: string;
+}
+
+/**
  * Immutable per-retrieval audit artifact for a single context assembly.
  * See `docs/state-assembly-receipts.md` in the server repository.
+ *
+ * The `mode` discriminator distinguishes:
+ * - `"retrieval"` — receipts emitted by `/v1/context` + `/v1/handoff`.
+ * - `"as_of_replay"` — receipts emitted by `POST /v1/receipts/{id}/replay`
+ *   (v0.9+); the `parentReceiptId` points at the source receipt.
  */
 export interface Receipt {
   receiptId: string;
   parentReceiptId: string | null;
-  mode: "retrieval" | string;
+  mode: "retrieval" | "as_of_replay" | string;
   queryId: string | null;
   taskId: string | null;
   tenantId: string | null;
@@ -128,8 +153,24 @@ export interface Receipt {
   selectedEntries: ReceiptSelectedEntry[];
   policy: ReceiptPolicy;
   output: ReceiptOutput;
+  /** Server region the receipt was emitted from (v0.9+ residency).
+   *  `null` in single-region deployments. */
   region: string | null;
+  /** HMAC-SHA256 hex digest over the canonical body (v0.9+ #157).
+   *  `null` for pre-v0.9 receipts or tenants without signing
+   *  configured — those verify cleanly as
+   *  `{valid: null, reason: "no_signature"}`. */
   receiptSignature: string | null;
+  /** Operator key id used to sign (v0.9+). `null`/`undefined` when unsigned. */
+  receiptSignatureKeyId?: string | null;
+  /** Algorithm + canonical-form version (e.g. "hmac-sha256-canonical-v1")
+   *  (v0.9+). `null`/`undefined` when unsigned. */
+  receiptSignatureAlgorithm?: string | null;
+  /** Embedded policy bundle YAML + hash + capture timestamp (v0.9+ #159).
+   *  See `PolicySnapshot`. `undefined` for pre-v0.9 receipts (the
+   *  replay endpoint refuses those with
+   *  `unreplayable.missing_policy_snapshot`). */
+  policySnapshot?: PolicySnapshot | null;
 }
 
 export interface ReceiptList {
@@ -145,6 +186,90 @@ export interface ListReceiptsParams {
   cursor?: string;
   limit?: number;
 }
+
+// ─── v0.9 receipt-governance result envelopes ────────────────────────────
+
+/**
+ * Result of `GET /v1/receipts/{id}/verify` (v0.9+ #157).
+ *
+ * `valid` is the verdict:
+ * - `true` — HMAC matches the canonical body. `reason === "ok"`.
+ * - `false` — math checked, signature does not cover the body.
+ *   `reason === "signature_mismatch"`.
+ * - `null` — verdict could not be determined. `reason` is one of:
+ *   - `"no_signature"` — receipt is unsigned (pre-v0.9 or tenant
+ *     didn't opt in).
+ *   - `"key_unavailable"` — the `keyId` rotated out of operator
+ *     config; receipt is no longer verifiable on this binary.
+ *   - `"unsupported_algorithm"` — receipt signed under a canonical
+ *     form / algorithm variant this binary doesn't implement.
+ *
+ * Comparison is constant-time on the server side; the signing key
+ * bytes never appear on the response.
+ */
+export interface ReceiptVerifyResult {
+  valid: boolean | null;
+  keyId: string | null;
+  algorithm: string | null;
+  reason:
+    | "ok"
+    | "signature_mismatch"
+    | "no_signature"
+    | "key_unavailable"
+    | "unsupported_algorithm"
+    | string;
+}
+
+/**
+ * Structural diff envelope returned by `POST /v1/receipts/{id}/replay`.
+ * Entries are matched by their `memoryId` / `episodeId` so re-ranking
+ * the same entry is reported under `common`, not as add+remove.
+ */
+export interface ReceiptReplayDiff {
+  contextHash: {
+    original: string | null;
+    replay: string | null;
+    changed: boolean;
+  };
+  selectedEntries: {
+    added: ReceiptSelectedEntry[];
+    removed: ReceiptSelectedEntry[];
+    common: number;
+  };
+  filtersApplied: {
+    added: unknown[];
+    removed: unknown[];
+  };
+}
+
+/**
+ * Response from `POST /v1/receipts/{id}/replay` (v0.9+ #159).
+ *
+ * Semantic: current code + original policy. Replay re-runs the
+ * original retrieval against the *current* memory state but with
+ * the *original* policy bundle frozen on the receipt's
+ * `policySnapshot`. The original receipt is never modified;
+ * `replayReceiptId` points at a new `mode="as_of_replay"` receipt
+ * linked back to the source via `parentReceiptId`.
+ *
+ * `replayReceiptId` is `null` when the replay-receipt write itself
+ * failed (rare, fail-open path). The `diff` envelope is still
+ * authoritative in that case.
+ */
+export interface ReceiptReplayResult {
+  originalReceiptId: string;
+  replayReceiptId: string | null;
+  diff: ReceiptReplayDiff;
+}
+
+/** The set of refusal reasons the server returns from
+ *  `POST /v1/receipts/{id}/replay` when a receipt cannot be replayed.
+ *  Used by `StatewaveUnreplayableError.reason` so callers can switch
+ *  on the structured value without parsing error code strings. */
+export type UnreplayableReason =
+  | "missing_policy_snapshot"
+  | "nested_replay"
+  | "invalid_snapshot";
 
 export interface Timeline {
   subjectId: string;
