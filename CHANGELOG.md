@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.10.1 (2026-05-27)
+
+### Added — v0.9 receipt-governance convenience methods (closes [statewave#170](https://github.com/smaramwbc/statewave/issues/170))
+
+Closes the gap where the v0.9 server release (`statewave` v0.9.1 / v0.9.2) added `GET /v1/receipts/{id}/verify` and `POST /v1/receipts/{id}/replay` but the SDK at v0.10.0 only knew about pre-v0.9 receipt endpoints.
+
+- **`verifyReceipt(receiptId): Promise<ReceiptVerifyResult>`** on `StatewaveClient`. Calls `GET /v1/receipts/{id}/verify` and returns a typed result with `valid` ∈ `{true, false, null}` plus `keyId`, `algorithm`, and a discriminated-union `reason` (`"ok" | "signature_mismatch" | "no_signature" | "key_unavailable" | "unsupported_algorithm"`). Comparison is constant-time on the server side; signing key bytes never appear on the response.
+- **`replayReceipt(receiptId): Promise<ReceiptReplayResult>`** on `StatewaveClient`. Calls `POST /v1/receipts/{id}/replay` and returns the original/replay receipt ids plus a typed `ReceiptReplayDiff` envelope (`contextHash`, `selectedEntries.{added,removed,common}`, `filtersApplied.{added,removed}`). The original receipt is never modified — replay only emits a new linked child.
+- **`StatewaveUnreplayableError`** (subclass of `StatewaveAPIError`) wraps the server's HTTP 422 refusal codes so callers can `if (err instanceof StatewaveUnreplayableError) { switch (err.reason) ... }` instead of parsing error code strings. `.reason` is the `UnreplayableReason` discriminated union (`"missing_policy_snapshot" | "nested_replay" | "invalid_snapshot"`). An *unrecognised* `unreplayable.<new_reason>` from a future server stays on the generic `StatewaveAPIError` path — does not crash an older client.
+
+### Changed — `Receipt` interface gains v0.9 governance fields
+
+The `Receipt` interface now declares the v0.9 fields the server began emitting in v0.9.1, all optional so pre-v0.9 receipts continue to parse cleanly:
+
+- `receiptSignatureKeyId?: string | null` — operator key id used to sign (#157).
+- `receiptSignatureAlgorithm?: string | null` — e.g. `"hmac-sha256-canonical-v1"` (#157).
+- `policySnapshot?: PolicySnapshot | null` — embedded bundle YAML + hash + capture timestamp the replay engine evaluates against (#159).
+- `mode` union widened from `"retrieval" | string` to `"retrieval" | "as_of_replay" | string` to surface the new replay mode.
+
+Without this change, pre-v0.10.1 clients hitting a v0.9.1+ server would still see the values at runtime (the wire arrives intact) but the TypeScript type would not document them and users had to cast.
+
+New public types: `PolicySnapshot`, `ReceiptVerifyResult`, `ReceiptReplayResult`, `ReceiptReplayDiff`, `UnreplayableReason`.
+
+### Notes
+
+- Purely additive — no existing method, interface, or behaviour changes. Upgrading from v0.10.0 should be a drop-in replacement.
+- Version-aligned with `statewave-py` v0.10.1, which lands the equivalent Python surface in parallel.
+- Part of the `statewave` v0.9.2 stabilization patch — see [v0.9.2 release notes](https://github.com/smaramwbc/statewave/releases/tag/v0.9.2) for the coordinated context.
+
 ## 0.10.0 (2026-05-21)
 
 ### Added — support-agent SDK methods
