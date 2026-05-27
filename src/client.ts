@@ -172,25 +172,36 @@ export class StatewaveClient {
   }
 
   async createEpisode(params: CreateEpisodeParams): Promise<Episode> {
-    return this.post("/v1/episodes", {
+    // `sessionId` is declared on the type but was silently dropped on the
+    // wire before v0.10.2 — forward it conditionally so the published
+    // contract matches the server's CreateEpisodeRequest schema (see
+    // statewave#174). Omitted when undefined so the wire shape stays
+    // byte-for-byte unchanged for callers that don't set it.
+    const body: Record<string, unknown> = {
       subjectId: params.subjectId,
       source: params.source,
       type: params.type,
       payload: params.payload,
       metadata: params.metadata ?? {},
       provenance: params.provenance ?? {},
-    });
+    };
+    if (params.sessionId !== undefined) body.sessionId = params.sessionId;
+    return this.post("/v1/episodes", body);
   }
 
   async createEpisodesBatch(episodes: CreateEpisodeParams[]): Promise<BatchCreateResult> {
-    return this.post("/v1/episodes/batch", { episodes: episodes.map(e => ({
-      subjectId: e.subjectId,
-      source: e.source,
-      type: e.type,
-      payload: e.payload,
-      metadata: e.metadata ?? {},
-      provenance: e.provenance ?? {},
-    }))});
+    return this.post("/v1/episodes/batch", { episodes: episodes.map(e => {
+      const item: Record<string, unknown> = {
+        subjectId: e.subjectId,
+        source: e.source,
+        type: e.type,
+        payload: e.payload,
+        metadata: e.metadata ?? {},
+        provenance: e.provenance ?? {},
+      };
+      if (e.sessionId !== undefined) item.sessionId = e.sessionId;
+      return item;
+    })});
   }
 
   async compileMemories(subjectId: string): Promise<CompileResult> {

@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.10.2 (2026-05-27)
+
+### Fixed — `sessionId` now actually reaches the wire on `createEpisode` (closes [statewave#174](https://github.com/smaramwbc/statewave/issues/174))
+
+The `CreateEpisodeParams` type has declared `sessionId?: string` since v0.10.0, but the `createEpisode` method was enumerating its forwarded fields by name and silently dropping `sessionId` before serialization. TypeScript users who set the field thinking it would attribute the episode to a session got episodes ingested without it. v0.9.4 launch-readiness picked this up as a visible REST-contract / SDK-behaviour mismatch worth closing before v1.0.
+
+- `createEpisode` now forwards `sessionId` to the wire as snake_case `session_id` when set. Omitted from the body when unset (matches the server's "no session pin" semantics — server does not auto-assign).
+- `createEpisodesBatch` has the same fix, per-item.
+- Pure-additive surface change. No breaking move; existing call sites continue to work byte-for-byte unchanged.
+- Round-trip is write-only: the server's `Episode` response does not echo `session_id` today, so the `Episode` type is unchanged.
+
+### Tests (+3)
+
+- `omits session_id from the wire when caller does not pass sessionId` — regression guard on the unchanged-wire-shape path.
+- `forwards sessionId to the wire as snake_case session_id when set` — the bug-fix proof.
+- `forwards sessionId per item in createEpisodesBatch` — same fix exercised on the batch endpoint.
+
+Full suite: **34 passed** (was 31). `tsc` build clean.
+
 ## 0.10.1 (2026-05-27)
 
 ### Added — v0.9 receipt-governance convenience methods (closes [statewave#170](https://github.com/smaramwbc/statewave/issues/170))
