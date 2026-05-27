@@ -624,3 +624,75 @@ describe("Retry behavior", () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe("createEpisode session_id forwarding (statewave#174)", () => {
+  it("omits session_id from the wire when caller does not pass sessionId", async () => {
+    let captured: Record<string, unknown> | undefined;
+    const mockFetch = vi.fn(async (_url: string, init: RequestInit) => {
+      captured = init.body ? JSON.parse(init.body as string) : undefined;
+      return new Response(JSON.stringify({
+        id: "ep-1", subject_id: "s1", source: "t", type: "t", payload: {},
+        metadata: {}, provenance: {}, created_at: "2026-01-01T00:00:00Z",
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const client = new StatewaveClient({ retry: { maxRetries: 0 } });
+    await client.createEpisode({ subjectId: "s1", source: "t", type: "t", payload: {} });
+
+    expect(captured).toBeDefined();
+    expect("session_id" in (captured ?? {})).toBe(false);
+    expect((captured ?? {}).subject_id).toBe("s1");
+    vi.unstubAllGlobals();
+  });
+
+  it("forwards sessionId to the wire as snake_case session_id when set", async () => {
+    let captured: Record<string, unknown> | undefined;
+    const mockFetch = vi.fn(async (_url: string, init: RequestInit) => {
+      captured = init.body ? JSON.parse(init.body as string) : undefined;
+      return new Response(JSON.stringify({
+        id: "ep-1", subject_id: "s1", source: "t", type: "t", payload: {},
+        metadata: {}, provenance: {}, created_at: "2026-01-01T00:00:00Z",
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const client = new StatewaveClient({ retry: { maxRetries: 0 } });
+    await client.createEpisode({
+      subjectId: "s1",
+      source: "t",
+      type: "t",
+      payload: {},
+      sessionId: "sess-abc-123",
+    });
+
+    expect((captured ?? {}).session_id).toBe("sess-abc-123");
+    vi.unstubAllGlobals();
+  });
+
+  it("forwards sessionId per item in createEpisodesBatch", async () => {
+    let captured: Record<string, unknown> | undefined;
+    const mockFetch = vi.fn(async (_url: string, init: RequestInit) => {
+      captured = init.body ? JSON.parse(init.body as string) : undefined;
+      return new Response(JSON.stringify({
+        results: [
+          { id: "ep-1", subject_id: "s1", source: "t", type: "t", payload: {}, metadata: {}, provenance: {}, created_at: "2026-01-01T00:00:00Z" },
+          { id: "ep-2", subject_id: "s1", source: "t", type: "t", payload: {}, metadata: {}, provenance: {}, created_at: "2026-01-01T00:00:00Z" },
+        ],
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const client = new StatewaveClient({ retry: { maxRetries: 0 } });
+    await client.createEpisodesBatch([
+      { subjectId: "s1", source: "t", type: "t", payload: {}, sessionId: "sess-1" },
+      { subjectId: "s1", source: "t", type: "t", payload: {} },
+    ]);
+
+    const eps = (captured ?? {}).episodes as Array<Record<string, unknown>>;
+    expect(eps).toHaveLength(2);
+    expect(eps[0].session_id).toBe("sess-1");
+    expect("session_id" in eps[1]).toBe(false);
+    vi.unstubAllGlobals();
+  });
+});
