@@ -151,6 +151,15 @@ export class StatewaveClient {
   private defaultHeaders: Record<string, string>;
   private retryConfig: Required<RetryConfig>;
 
+  /**
+   * Create a Statewave client.
+   *
+   * @param options - A base-URL string, or a {@link ClientOptions} object
+   *   with `baseUrl`, optional `apiKey` / `tenantId`, and optional `retry`
+   *   config. Defaults to `http://localhost:8100`; trailing slashes are trimmed.
+   * @example
+   * const sw = new StatewaveClient({ baseUrl: "http://localhost:8100", apiKey: "sk-…" });
+   */
   constructor(options: ClientOptions | string = "http://localhost:8100") {
     const opts = typeof options === "string" ? { baseUrl: options } : options;
     const rawBaseUrl = opts.baseUrl ?? "http://localhost:8100";
@@ -171,6 +180,17 @@ export class StatewaveClient {
     };
   }
 
+  /**
+   * Ingest a single immutable episode (a raw event) for a subject.
+   *
+   * @param params - Subject id, `source`, `type`, `payload`, and optional
+   *   `metadata` / `provenance` / `sessionId`.
+   * @returns The created {@link Episode}.
+   * @throws {StatewaveAPIError} On a non-2xx response (e.g. validation).
+   * @throws {StatewaveConnectionError} If the server is unreachable.
+   * @example
+   * await sw.createEpisode({ subjectId: "user:42", source: "chat", type: "message", payload: { text: "hi" } });
+   */
   async createEpisode(params: CreateEpisodeParams): Promise<Episode> {
     // `sessionId` is declared on the type but was silently dropped on the
     // wire before v0.10.2 — forward it conditionally so the published
@@ -189,6 +209,17 @@ export class StatewaveClient {
     return this.post("/v1/episodes", body);
   }
 
+  /**
+   * Ingest up to 100 episodes in one request.
+   *
+   * @param episodes - Array of {@link CreateEpisodeParams} (same shape as
+   *   {@link StatewaveClient.createEpisode}).
+   * @returns A {@link BatchCreateResult} with per-item outcomes.
+   * @throws {StatewaveAPIError} On a non-2xx response.
+   * @throws {StatewaveConnectionError} If the server is unreachable.
+   * @example
+   * await sw.createEpisodesBatch([{ subjectId: "user:42", source: "chat", type: "message", payload: { text: "a" } }]);
+   */
   async createEpisodesBatch(episodes: CreateEpisodeParams[]): Promise<BatchCreateResult> {
     return this.post("/v1/episodes/batch", { episodes: episodes.map(e => {
       const item: Record<string, unknown> = {
@@ -204,21 +235,60 @@ export class StatewaveClient {
     })});
   }
 
+  /**
+   * Compile a subject's raw episodes into typed, ranked memories
+   * (synchronous — waits for the compile to finish).
+   *
+   * @param subjectId - The subject to compile.
+   * @returns A {@link CompileResult} summarising what was produced.
+   * @throws {StatewaveAPIError} On a non-2xx response.
+   * @throws {StatewaveConnectionError} If the server is unreachable.
+   * @example
+   * await sw.compileMemories("user:42");
+   */
   async compileMemories(subjectId: string): Promise<CompileResult> {
     return this.post("/v1/memories/compile", { subjectId });
   }
 
-  /** Submit async compilation — returns immediately with a jobId. */
+  /**
+   * Submit compilation as a background job — returns immediately.
+   *
+   * @param subjectId - The subject to compile.
+   * @returns A {@link CompileJob} whose `jobId` you can poll with
+   *   {@link StatewaveClient.getCompileStatus}.
+   * @throws {StatewaveAPIError} On a non-2xx response.
+   * @example
+   * const job = await sw.compileMemoriesAsync("user:42");
+   */
   async compileMemoriesAsync(subjectId: string): Promise<CompileJob> {
     return this.post("/v1/memories/compile", { subjectId, async: true });
   }
 
-  /** Poll the status of an async compile job. */
+  /**
+   * Poll the status of an async compile job.
+   *
+   * @param jobId - The `jobId` from {@link StatewaveClient.compileMemoriesAsync}.
+   * @returns The {@link CompileJob} with its current `status`.
+   * @throws {StatewaveAPIError} On a non-2xx response (e.g. unknown job).
+   * @example
+   * const job = await sw.getCompileStatus(jobId);
+   */
   async getCompileStatus(jobId: string): Promise<CompileJob> {
     return this.get(`/v1/memories/compile/${encodeURIComponent(jobId)}`);
   }
 
-  /** Submit async compilation and poll until terminal state or timeout. */
+  /**
+   * Submit async compilation and poll until it reaches a terminal state.
+   *
+   * @param subjectId - The subject to compile.
+   * @param options - Optional `pollInterval` (ms, default 500) and `timeout`
+   *   (ms, default 60000).
+   * @returns The terminal {@link CompileJob} (`completed` or `failed`).
+   * @throws {Error} If the job does not finish within `timeout`.
+   * @throws {StatewaveAPIError} On a non-2xx response.
+   * @example
+   * const job = await sw.compileMemoriesWait("user:42", { timeout: 30_000 });
+   */
   async compileMemoriesWait(
     subjectId: string,
     options?: { pollInterval?: number; timeout?: number }
@@ -238,6 +308,17 @@ export class StatewaveClient {
     throw new Error(`Compile job ${job.jobId} did not complete within ${timeout}ms`);
   }
 
+  /**
+   * Search a subject's compiled memories — lexical by default, or semantic
+   * when `semantic: true` (requires a real embedding provider).
+   *
+   * @param params - `subjectId` plus optional `kind`, `query`, `semantic`,
+   *   and `limit`.
+   * @returns A {@link SearchResult}.
+   * @throws {StatewaveAPIError} On a non-2xx response.
+   * @example
+   * await sw.searchMemories({ subjectId: "user:42", query: "plan tier", semantic: true });
+   */
   async searchMemories(params: SearchMemoriesParams): Promise<SearchResult> {
     const qs = new URLSearchParams({ subject_id: params.subjectId });
     if (params.kind) qs.set("kind", params.kind);
@@ -247,6 +328,21 @@ export class StatewaveClient {
     return this.get(`/v1/memories/search?${qs}`);
   }
 
+  /**
+   * Assemble a ranked, token-bounded context bundle for a subject + task.
+   * Deterministic: the same `(subjectId, task, maxTokens)` returns the same
+   * bundle. Pass `emitReceipt: true` to emit a state-assembly receipt.
+   *
+   * @param params - `subjectId`, `task`, and optional `maxTokens`,
+   *   `sessionId`, `emitReceipt`, `queryId`, `taskId`, `parentReceiptId`,
+   *   `callerId`, `callerType`.
+   * @returns A {@link ContextBundle} (`assembledContext`, `facts`,
+   *   `tokenEstimate`, `provenance`).
+   * @throws {StatewaveAPIError} On a non-2xx response (e.g. 401 when the
+   *   tenant requires caller identity).
+   * @example
+   * const bundle = await sw.getContext({ subjectId: "user:42", task: question, maxTokens: 2000 });
+   */
   async getContext(params: GetContextParams): Promise<ContextBundle> {
     return this.post("/v1/context", {
       subjectId: params.subjectId,
@@ -280,7 +376,16 @@ export class StatewaveClient {
     );
   }
 
-  /** Return just the assembled context string, ready to inject into a prompt. */
+  /**
+   * Convenience wrapper over {@link StatewaveClient.getContext} that returns
+   * only the `assembledContext` string, ready to inject into a prompt.
+   *
+   * @param params - Same as {@link StatewaveClient.getContext}.
+   * @returns The assembled context string.
+   * @throws {StatewaveAPIError} On a non-2xx response.
+   * @example
+   * const ctx = await sw.getContextString({ subjectId: "user:42", task: question, maxTokens: 2000 });
+   */
   async getContextString(params: GetContextParams): Promise<string> {
     const bundle = await this.getContext(params);
     return bundle.assembledContext;
@@ -288,7 +393,16 @@ export class StatewaveClient {
 
   // -- Receipts --------------------------------------------------------
 
-  /** Fetch a single state-assembly receipt by ULID. */
+  /**
+   * Fetch a single state-assembly receipt by its ULID.
+   *
+   * @param receiptId - The receipt ULID.
+   * @returns The {@link Receipt}.
+   * @throws {StatewaveAPIError} On 404 (not found / different tenant) or
+   *   other non-2xx responses.
+   * @example
+   * const receipt = await sw.getReceipt("01J…");
+   */
   async getReceipt(receiptId: string): Promise<Receipt> {
     return this.get(`/v1/receipts/${encodeURIComponent(receiptId)}`);
   }
@@ -441,14 +555,42 @@ export class StatewaveClient {
     return this.get(`/v1/resolutions?${qs}`);
   }
 
+  /**
+   * Fetch the chronological episode + memory timeline for a subject.
+   *
+   * @param subjectId - The subject to fetch.
+   * @returns The {@link Timeline}.
+   * @throws {StatewaveAPIError} On a non-2xx response.
+   * @example
+   * const timeline = await sw.getTimeline("user:42");
+   */
   async getTimeline(subjectId: string): Promise<Timeline> {
     return this.get(`/v1/timeline?subject_id=${encodeURIComponent(subjectId)}`);
   }
 
+  /**
+   * Delete all episodes and memories for a subject — the GDPR-shaped
+   * "forget this user" operation. Irreversible.
+   *
+   * @param subjectId - The subject to delete.
+   * @returns A {@link DeleteResult} with the counts removed.
+   * @throws {StatewaveAPIError} On a non-2xx response.
+   * @example
+   * await sw.deleteSubject("user:42");
+   */
   async deleteSubject(subjectId: string): Promise<DeleteResult> {
     return this.request("DELETE", `/v1/subjects/${encodeURIComponent(subjectId)}`);
   }
 
+  /**
+   * List subjects known to the instance, with optional pagination.
+   *
+   * @param params - Optional `limit` and `offset`.
+   * @returns A {@link ListSubjectsResult}.
+   * @throws {StatewaveAPIError} On a non-2xx response.
+   * @example
+   * const { subjects } = await sw.listSubjects({ limit: 50 });
+   */
   async listSubjects(params?: { limit?: number; offset?: number }): Promise<ListSubjectsResult> {
     const qs = new URLSearchParams();
     if (params?.limit !== undefined) qs.set("limit", String(params.limit));
