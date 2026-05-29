@@ -1,4 +1,4 @@
 node_modules/
 dist/
 package-lock.json
-AGENTS.md
+AGENTS_INTERNAL.md
