@@ -1,6 +1,14 @@
 # Changelog
 
-## 0.10.2 (2026-05-27)
+## 1.0.0 (2026-06-09)
+
+First **stable** public release of the Statewave TypeScript SDK (`@statewavedev/sdk`), cut alongside the Statewave v1.0 server. The typed surface matches the `/v1` REST contract and is semver-stable from 1.0.0 forward. This release supersedes the never-published 0.10.2 prep and folds in its changes.
+
+### Fixed — `sessionId` now reaches the wire on `createEpisode` / `createEpisodesBatch` (closes [statewave#174](https://github.com/smaramwbc/statewave/issues/174))
+
+- `CreateEpisodeParams.sessionId` has been declared since v0.10.0 but was silently dropped before serialization; it is now forwarded as snake_case `session_id`, omitted from the body when unset, and fixed per-item in `createEpisodesBatch`. Pure-additive on the wire; existing call sites are unaffected. (Originally prepared as 0.10.2, below.)
+
+## 0.10.2 (2026-05-27 — unreleased; folded into 1.0.0)
 
 ### Fixed — `sessionId` now actually reaches the wire on `createEpisode` (closes [statewave#174](https://github.com/smaramwbc/statewave/issues/174))
 
