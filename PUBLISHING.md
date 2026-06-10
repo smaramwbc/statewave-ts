@@ -22,13 +22,13 @@ npm access list packages @statewavedev
 3. **Commit** to main:
    ```bash
    git add package.json CHANGELOG.md
-   git commit -m "release: v0.X.Y"
+   git commit -m "release: vX.Y.Z"
    git push
    ```
 4. **Wait for CI to pass** on the main branch push.
 5. **Tag and push**:
    ```bash
-   git tag v0.X.Y
+   git tag vX.Y.Z
    git push --tags
    ```
 6. The `release.yml` workflow will:
@@ -50,7 +50,7 @@ npm access list packages @statewavedev
 
 - [ ] GitHub Release exists at `https://github.com/smaramwbc/statewave-ts/releases`
 - [ ] npm package updated: `npm view @statewavedev/sdk`
-- [ ] Install works: `npm install @statewavedev/sdk@0.X.Y`
+- [ ] Install works: `npm install @statewavedev/sdk@X.Y.Z`
 - [ ] CHANGELOG version matches tag
 - [ ] Provenance attestation present: `npm view @statewavedev/sdk dist.attestations`
 
