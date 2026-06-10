@@ -16,7 +16,7 @@ Start with the documentation:
 For questions and discussions:
 
 - **[GitHub Discussions](https://github.com/smaramwbc/statewave/discussions)** - Ask questions, share ideas
-- Questions labeled `question` in any repo
+- Questions labeled `question` in the central [issue tracker](https://github.com/smaramwbc/statewave/issues)
 
 ## 🐛 Bug Reports
 

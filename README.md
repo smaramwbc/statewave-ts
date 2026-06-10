@@ -6,11 +6,13 @@
 
 Official TypeScript SDK for [Statewave](https://github.com/smaramwbc/statewave) — memory runtime for AI agents and applications.
 
+Current release: **v1.0.0** — the first stable public developer release. The typed surface matches the `/v1` REST contract and is semver-stable from 1.0.0 forward.
+
 > **Part of the Statewave ecosystem:** [Server](https://github.com/smaramwbc/statewave) · [Python SDK](https://github.com/smaramwbc/statewave-py) · **TypeScript SDK** · [Connectors](https://github.com/smaramwbc/statewave-connectors) · [Docs](https://github.com/smaramwbc/statewave-docs) · [Examples](https://github.com/smaramwbc/statewave-examples) · [Website + demo](https://statewave.ai) · [Admin](https://github.com/smaramwbc/statewave-admin)
 >
 > 📋 **Issues & feature requests:** [statewave/issues](https://github.com/smaramwbc/statewave/issues) (centralized tracker)
 
-> ⚠️ **v0.9.0 is a breaking change.** The entire SDK surface — request params *and* response fields — is now idiomatic **camelCase** (`subjectId`, `maxTokens`, `createdAt`, `receiptId`, …). The wire protocol is unchanged; the client maps to/from the server's snake_case transparently. `payload`, `metadata`, and `provenance` are passed through verbatim — their inner keys are never rewritten. See [CHANGELOG](CHANGELOG.md#090) for the full rename table and migration steps.
+> **Upgrading from a pre-0.9 SDK?** v0.9.0 renamed the entire surface — request params *and* response fields — to idiomatic **camelCase** (`subjectId`, `maxTokens`, `createdAt`, `receiptId`, …). The wire protocol is unchanged; the client maps to/from the server's snake_case transparently. `payload`, `metadata`, and `provenance` are passed through verbatim — their inner keys are never rewritten. See [CHANGELOG](CHANGELOG.md#090-2026-05-16) for the full rename table and migration steps.
 
 > **New to Statewave?** This SDK is a thin client for a running **Statewave
 > server**. If you don't have one yet, the
@@ -44,6 +46,7 @@ await sw.createEpisode({
   subjectId: "user-42",
   source: "support-chat",
   type: "conversation",
+  sessionId: "ticket-8842", // optional — attribute the episode to a session (v1.0+)
   payload: {
     messages: [
       { role: "user", content: "My name is Alice and I work at Globex." },
@@ -291,6 +294,8 @@ All response types are fully typed:
 - `HealthState` / `ResolutionStatus` — string-literal status unions
 
 Param types: `CreateEpisodeParams`, `SearchMemoriesParams`, `GetContextParams`, `ListReceiptsParams`, `SetMemoryLabelsParams`, `GetSLAParams`, `CreateHandoffParams`, `CreateResolutionParams`, `ListResolutionsParams`
+
+`CreateEpisodeParams` accepts an optional `sessionId` (v1.0+) to attribute an episode to a session; it is forwarded on both `createEpisode` and `createEpisodesBatch`.
 
 ## Running tests
 

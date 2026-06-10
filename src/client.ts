@@ -193,10 +193,11 @@ export class StatewaveClient {
    */
   async createEpisode(params: CreateEpisodeParams): Promise<Episode> {
     // `sessionId` is declared on the type but was silently dropped on the
-    // wire before v0.10.2 — forward it conditionally so the published
-    // contract matches the server's CreateEpisodeRequest schema (see
-    // statewave#174). Omitted when undefined so the wire shape stays
-    // byte-for-byte unchanged for callers that don't set it.
+    // wire before v1.0.0 (fix prepared as the unreleased 0.10.2) — forward
+    // it conditionally so the published contract matches the server's
+    // CreateEpisodeRequest schema (see statewave#174). Omitted when undefined
+    // so the wire shape stays byte-for-byte unchanged for callers that don't
+    // set it.
     const body: Record<string, unknown> = {
       subjectId: params.subjectId,
       source: params.source,
