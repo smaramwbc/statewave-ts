@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.1 (2026-06-11)
+
+Metadata-only refresh — no API or behavior changes. Republishes the package so the
+registry reflects the corrected packaging metadata that landed after 1.0.0:
+
+- `bugs` URL points to the central Statewave issue tracker
+  (`github.com/smaramwbc/statewave/issues`); per-repo Issues tabs are disabled.
+- Maturity wording aligned to the conservative canonical framing ("first stable
+  public developer release") — no production-ready / enterprise-ready claims.
+
+The public API, wire protocol, and behavior are identical to 1.0.0.
+
 ## 1.0.0 (2026-06-09)
 
 First **stable** public release of the Statewave TypeScript SDK (`@statewavedev/sdk`), cut alongside the Statewave v1.0 server. The typed surface matches the `/v1` REST contract and is semver-stable from 1.0.0 forward. This release supersedes the never-published 0.10.2 prep and folds in its changes.
