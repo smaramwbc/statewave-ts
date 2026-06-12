@@ -207,6 +207,7 @@ export class StatewaveClient {
       provenance: params.provenance ?? {},
     };
     if (params.sessionId !== undefined) body.sessionId = params.sessionId;
+    if (params.idempotencyKey !== undefined) body.idempotencyKey = params.idempotencyKey;
     return this.post("/v1/episodes", body);
   }
 
@@ -232,6 +233,7 @@ export class StatewaveClient {
         provenance: e.provenance ?? {},
       };
       if (e.sessionId !== undefined) item.sessionId = e.sessionId;
+      if (e.idempotencyKey !== undefined) item.idempotencyKey = e.idempotencyKey;
       return item;
     })});
   }

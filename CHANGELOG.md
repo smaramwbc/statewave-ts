@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `createEpisode` / `createEpisodesBatch` accept an optional `idempotencyKey`. Re-ingesting an episode with the same key is a no-op server-side (the server returns the existing episode), so re-running a backfill or retrying a request no longer duplicates episodes.
+
 ## 1.0.1 (2026-06-11)
 
 Metadata-only refresh — no API or behavior changes. Republishes the package so the

@@ -417,6 +417,12 @@ export interface CreateEpisodeParams {
   metadata?: Record<string, unknown>;
   provenance?: Record<string, unknown>;
   sessionId?: string;
+  /**
+   * De-dup key. Re-ingesting an episode with the same key (re-running a
+   * backfill, retrying a failed request) is a no-op — the server returns the
+   * existing episode instead of inserting a duplicate.
+   */
+  idempotencyKey?: string;
 }
 
 export interface SearchMemoriesParams {
