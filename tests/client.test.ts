@@ -696,3 +696,39 @@ describe("createEpisode session_id forwarding (statewave#174)", () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe("createEpisode idempotencyKey forwarding", () => {
+  it("forwards idempotencyKey to the wire as snake_case idempotency_key", async () => {
+    let captured: Record<string, unknown> | undefined;
+    const mockFetch = vi.fn(async (_url: string, init: RequestInit) => {
+      captured = init.body ? JSON.parse(init.body as string) : undefined;
+      return new Response(JSON.stringify({
+        id: "ep-1", subject_id: "s1", source: "t", type: "t", payload: {},
+        metadata: {}, provenance: {}, created_at: "2026-01-01T00:00:00Z",
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    });
+    vi.stubGlobal("fetch", mockFetch);
+    const client = new StatewaveClient({ retry: { maxRetries: 0 } });
+    await client.createEpisode({ subjectId: "s1", source: "t", type: "t", payload: {}, idempotencyKey: "git:commit:abc" });
+    expect((captured ?? {}).idempotency_key).toBe("git:commit:abc");
+    vi.unstubAllGlobals();
+  });
+
+  it("omits idempotency_key when unset, forwards per-item in batch", async () => {
+    let captured: Record<string, unknown> | undefined;
+    const mockFetch = vi.fn(async (_url: string, init: RequestInit) => {
+      captured = init.body ? JSON.parse(init.body as string) : undefined;
+      return new Response(JSON.stringify({ results: [] }), { status: 200, headers: { "Content-Type": "application/json" } });
+    });
+    vi.stubGlobal("fetch", mockFetch);
+    const client = new StatewaveClient({ retry: { maxRetries: 0 } });
+    await client.createEpisodesBatch([
+      { subjectId: "s1", source: "t", type: "t", payload: {}, idempotencyKey: "k1" },
+      { subjectId: "s1", source: "t", type: "t", payload: {} },
+    ]);
+    const eps = (captured ?? {}).episodes as Array<Record<string, unknown>>;
+    expect(eps[0].idempotency_key).toBe("k1");
+    expect("idempotency_key" in eps[1]).toBe(false);
+    vi.unstubAllGlobals();
+  });
+});
