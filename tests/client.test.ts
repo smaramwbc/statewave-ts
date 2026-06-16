@@ -697,6 +697,96 @@ describe("createEpisode session_id forwarding (statewave#174)", () => {
   });
 });
 
+describe("AbortSignal support", () => {
+  it("passes signal to fetch", async () => {
+    const controller = new AbortController();
+    let capturedSignal: AbortSignal | null | undefined = undefined;
+    const mockFetch = vi.fn(async (_url: string, init?: RequestInit) => {
+      capturedSignal = init?.signal as AbortSignal | null | undefined;
+      return new Response(
+        JSON.stringify({
+          subject_id: "u1", task: "q", facts: [], episodes: [], procedures: [],
+          provenance: {}, assembled_context: "", token_estimate: 0,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    });
+    vi.stubGlobal("fetch", mockFetch);
+    const client = new StatewaveClient({ retry: false });
+    await client.getContext({ subjectId: "u1", task: "q" }, { signal: controller.signal });
+    expect(capturedSignal).toBe(controller.signal);
+    vi.unstubAllGlobals();
+  });
+
+  it("propagates AbortError without retrying", async () => {
+    const controller = new AbortController();
+    let callCount = 0;
+    const mockFetch = vi.fn(async () => {
+      callCount++;
+      throw new DOMException("Aborted", "AbortError");
+    });
+    vi.stubGlobal("fetch", mockFetch);
+    const client = new StatewaveClient({ retry: { maxRetries: 3 } });
+    await expect(
+      client.getContext({ subjectId: "u1", task: "q" }, { signal: controller.signal }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(callCount).toBe(1);
+    vi.unstubAllGlobals();
+  });
+
+  it("does not retry when signal is already aborted before call", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const mockFetch = vi.fn(async () => {
+      throw new DOMException("Aborted", "AbortError");
+    });
+    vi.stubGlobal("fetch", mockFetch);
+    const client = new StatewaveClient({ retry: { maxRetries: 3 } });
+    await expect(
+      client.createEpisode(
+        { subjectId: "u1", source: "chat", type: "message", payload: {} },
+        { signal: controller.signal },
+      ),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    vi.unstubAllGlobals();
+  });
+
+  it("forwards signal to createEpisodesBatch", async () => {
+    const controller = new AbortController();
+    let capturedSignal: AbortSignal | null | undefined = undefined;
+    const mockFetch = vi.fn(async (_url: string, init?: RequestInit) => {
+      capturedSignal = init?.signal as AbortSignal | null | undefined;
+      return new Response(
+        JSON.stringify({ episodes_created: 0, episodes: [] }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    });
+    vi.stubGlobal("fetch", mockFetch);
+    const client = new StatewaveClient({ retry: false });
+    await client.createEpisodesBatch([], { signal: controller.signal });
+    expect(capturedSignal).toBe(controller.signal);
+    vi.unstubAllGlobals();
+  });
+
+  it("allows calls without a signal (backward compatible)", async () => {
+    const mockFetch = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          subject_id: "u1", task: "q", facts: [], episodes: [], procedures: [],
+          provenance: {}, assembled_context: "ctx", token_estimate: 10,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", mockFetch);
+    const client = new StatewaveClient({ retry: false });
+    const bundle = await client.getContext({ subjectId: "u1", task: "q" });
+    expect(bundle.assembledContext).toBe("ctx");
+    vi.unstubAllGlobals();
+  });
+});
+
 describe("createEpisode idempotencyKey forwarding", () => {
   it("forwards idempotencyKey to the wire as snake_case idempotency_key", async () => {
     let captured: Record<string, unknown> | undefined;
