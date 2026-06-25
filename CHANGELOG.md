@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.0 (2026-06-17)
+
+- Every public method now accepts an optional final `options?: RequestOptions` parameter carrying an `AbortSignal` (`{ signal?: AbortSignal }`), so callers can cancel in-flight requests.
+  - The signal is forwarded directly to the underlying `fetch()` call; when it fires, the `AbortError` propagates immediately without retrying (abort is intentional, not a transient failure).
+  - `compileMemoriesWait` polls cooperatively — the sleep between polls also listens on the signal, so cancellation is low-latency.
+- Backward-compatible: all existing call sites compile and behave unchanged.
+
 ## 1.1.0 (2026-06-12)
 
 - `createEpisode` / `createEpisodesBatch` accept an optional `idempotencyKey`. Re-ingesting an episode with the same key is a no-op server-side (the server returns the existing episode), so re-running a backfill or retrying a request no longer duplicates episodes.

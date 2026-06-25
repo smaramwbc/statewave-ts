@@ -6,7 +6,7 @@
 
 Official TypeScript SDK for [Statewave](https://github.com/smaramwbc/statewave) — memory runtime for AI agents and applications.
 
-Current release: **v1.0.0** — the first stable public developer release. The typed surface matches the `/v1` REST contract and is semver-stable from 1.0.0 forward.
+Current release: **v1.2.0** — the typed surface matches the `/v1` REST contract and is semver-stable from 1.0.0 forward.
 
 > **Part of the Statewave ecosystem:** [Server](https://github.com/smaramwbc/statewave) · [Python SDK](https://github.com/smaramwbc/statewave-py) · **TypeScript SDK** · [Connectors](https://github.com/smaramwbc/statewave-connectors) · [Docs](https://github.com/smaramwbc/statewave-docs) · [Examples](https://github.com/smaramwbc/statewave-examples) · [Website + demo](https://statewave.ai) · [Admin](https://github.com/smaramwbc/statewave-admin)
 >
@@ -15,10 +15,12 @@ Current release: **v1.0.0** — the first stable public developer release. The t
 > **Upgrading from a pre-0.9 SDK?** v0.9.0 renamed the entire surface — request params *and* response fields — to idiomatic **camelCase** (`subjectId`, `maxTokens`, `createdAt`, `receiptId`, …). The wire protocol is unchanged; the client maps to/from the server's snake_case transparently. `payload`, `metadata`, and `provenance` are passed through verbatim — their inner keys are never rewritten. See [CHANGELOG](CHANGELOG.md#090-2026-05-16) for the full rename table and migration steps.
 
 > **New to Statewave?** This SDK is a thin client for a running **Statewave
-> server**. If you don't have one yet, the
+> server**. The fastest way to get one running is `npx @statewavedev/statewave`
+> (or `curl -fsSL https://www.statewave.ai/install | sh`, or on Windows
+> `powershell -Command "irm https://www.statewave.ai/install.ps1 | iex"`); see the
 > [Getting Started guide](https://github.com/smaramwbc/statewave-docs/blob/main/getting-started.md)
-> brings one up with Docker Compose in about 5 minutes. Every example below
-> assumes a server reachable at `http://localhost:8100`.
+> for the manual Docker Compose path. Every example below assumes a server
+> reachable at `http://localhost:8100`.
 
 ## Install
 
