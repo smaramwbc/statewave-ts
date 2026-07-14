@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.4.0 (2026-07-14)
+
+Parity release with `statewave` server v1.4.0 — no SDK behavior changes since v1.2.0.
+
+- CI: `actions/checkout` bumped to v7.
+- Dev-deps: `typescript` bumped 6.0.3 → 7.0.2 (dev-only; runtime unchanged, no output-shape change).
+- Docs: README `## Current release` refreshed and install one-liners surfaced.
+
+The v1.2.0 `AbortSignal` support on all HTTP methods remains the current SDK surface.
+
 ## 1.2.0 (2026-06-17)
 
 - Every public method now accepts an optional final `options?: RequestOptions` parameter carrying an `AbortSignal` (`{ signal?: AbortSignal }`), so callers can cancel in-flight requests.
