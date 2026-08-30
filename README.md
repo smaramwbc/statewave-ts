@@ -96,9 +96,13 @@ for (const s of subjects.subjects) {
   console.log(`${s.subjectId}: ${s.episodeCount} episodes, ${s.memoryCount} memories`);
 }
 
-// Get timeline
+// Get timeline — the server's default page is the OLDEST episodes
 const timeline = await sw.getTimeline("user-42");
 console.log(`${timeline.episodes.length} episodes, ${timeline.memories.length} memories`);
+
+// A bounded window of RECENT history (ascending within the page)
+const recent = await sw.getTimeline("user-42", { limit: 20, newestFirst: true });
+if (recent.episodesHasMore) console.log("older episodes exist beyond this page");
 
 // Delete all subject data
 await sw.deleteSubject("user-42");

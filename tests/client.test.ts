@@ -822,3 +822,137 @@ describe("createEpisode idempotencyKey forwarding", () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe("getTimeline pagination", () => {
+  const timelineBody = JSON.stringify({
+    subject_id: "u1",
+    episodes: [],
+    memories: [],
+    episodes_has_more: true,
+    memories_has_more: false,
+  });
+
+  const stub = () => {
+    const mockFetch = vi.fn(
+      async () =>
+        new Response(timelineBody, {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+    vi.stubGlobal("fetch", mockFetch);
+    return mockFetch;
+  };
+
+  it("sends only subject_id when no params are given", async () => {
+    const mockFetch = stub();
+    const client = new StatewaveClient({ retry: false });
+    await client.getTimeline("u1");
+    const url = new URL(mockFetch.mock.calls[0][0] as string);
+    expect(url.searchParams.get("subject_id")).toBe("u1");
+    expect([...url.searchParams.keys()]).toEqual(["subject_id"]);
+    vi.unstubAllGlobals();
+  });
+
+  it("maps camelCase params onto the snake_case wire names", async () => {
+    const mockFetch = stub();
+    const client = new StatewaveClient({ retry: false });
+    await client.getTimeline("u1", { limit: 20, offset: 5, newestFirst: true });
+    const url = new URL(mockFetch.mock.calls[0][0] as string);
+    expect(url.searchParams.get("limit")).toBe("20");
+    expect(url.searchParams.get("offset")).toBe("5");
+    expect(url.searchParams.get("newest_first")).toBe("true");
+    vi.unstubAllGlobals();
+  });
+
+  it("sends newest_first=false when the caller asks for it explicitly", async () => {
+    const mockFetch = stub();
+    const client = new StatewaveClient({ retry: false });
+    await client.getTimeline("u1", { newestFirst: false });
+    const url = new URL(mockFetch.mock.calls[0][0] as string);
+    expect(url.searchParams.get("newest_first")).toBe("false");
+    vi.unstubAllGlobals();
+  });
+
+  it("encodes a subject id that contains query-string characters", async () => {
+    const mockFetch = stub();
+    const client = new StatewaveClient({ retry: false });
+    // A subject id is caller-supplied text. `encodeURIComponent` already
+    // escaped it correctly, so this guards that swapping in the new builder
+    // did not regress how such an id round-trips.
+    await client.getTimeline("tenant a/user&limit=1", { limit: 20 });
+    const url = new URL(mockFetch.mock.calls[0][0] as string);
+    expect(url.searchParams.get("subject_id")).toBe("tenant a/user&limit=1");
+    expect(url.searchParams.get("limit")).toBe("20");
+    vi.unstubAllGlobals();
+  });
+
+  it("still forwards a signal passed in the old second-argument position", async () => {
+    // `getTimeline(id, { signal })` was the entire signature before `params`
+    // existed. It must keep cancelling, not quietly become a no-op params bag.
+    const controller = new AbortController();
+    let seen: AbortSignal | undefined;
+    const mockFetch = vi.fn(async (_url: string, init?: RequestInit) => {
+      seen = init?.signal ?? undefined;
+      return new Response(timelineBody, {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+    vi.stubGlobal("fetch", mockFetch);
+    const client = new StatewaveClient({ retry: false });
+    await client.getTimeline("u1", { signal: controller.signal });
+    expect(seen).toBe(controller.signal);
+    const url = new URL(mockFetch.mock.calls[0][0] as string);
+    expect([...url.searchParams.keys()]).toEqual(["subject_id"]);
+    vi.unstubAllGlobals();
+  });
+
+  it("forwards params and a signal together in the three-argument form", async () => {
+    const controller = new AbortController();
+    let seen: AbortSignal | undefined;
+    const mockFetch = vi.fn(async (_url: string, init?: RequestInit) => {
+      seen = init?.signal ?? undefined;
+      return new Response(timelineBody, {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+    vi.stubGlobal("fetch", mockFetch);
+    const client = new StatewaveClient({ retry: false });
+    await client.getTimeline("u1", { limit: 20, newestFirst: true }, { signal: controller.signal });
+    expect(seen).toBe(controller.signal);
+    const url = new URL(mockFetch.mock.calls[0][0] as string);
+    expect(url.searchParams.get("limit")).toBe("20");
+    expect(url.searchParams.get("newest_first")).toBe("true");
+    vi.unstubAllGlobals();
+  });
+
+  it("maps the has-more flags to camelCase", async () => {
+    stub();
+    const client = new StatewaveClient({ retry: false });
+    const timeline = await client.getTimeline("u1", { limit: 1 });
+    expect(timeline.episodesHasMore).toBe(true);
+    expect(timeline.memoriesHasMore).toBe(false);
+    vi.unstubAllGlobals();
+  });
+
+  it("leaves the has-more flags undefined when the server omits them", async () => {
+    // An older instance answers without the flags. `undefined` must stay
+    // undefined rather than defaulting to `false`, which would read as a
+    // positive claim that the page is complete.
+    const mockFetch = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ subject_id: "u1", episodes: [], memories: [] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+    vi.stubGlobal("fetch", mockFetch);
+    const client = new StatewaveClient({ retry: false });
+    const timeline = await client.getTimeline("u1");
+    expect(timeline.episodesHasMore).toBeUndefined();
+    expect(timeline.memoriesHasMore).toBeUndefined();
+    vi.unstubAllGlobals();
+  });
+});

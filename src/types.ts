@@ -275,6 +275,16 @@ export interface Timeline {
   subjectId: string;
   episodes: Episode[];
   memories: Memory[];
+  /**
+   * Whether more episodes exist beyond this page.
+   *
+   * Optional because an older instance does not send it. `undefined` means
+   * "this server did not say", which is not the same as `false` — do not
+   * treat a missing flag as proof the page is complete.
+   */
+  episodesHasMore?: boolean;
+  /** Whether more memories exist beyond this page. See {@link Timeline.episodesHasMore}. */
+  memoriesHasMore?: boolean;
 }
 
 export interface DeleteResult {

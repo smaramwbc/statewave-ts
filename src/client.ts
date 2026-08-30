@@ -147,6 +147,21 @@ export class StatewaveUnreplayableError extends StatewaveAPIError {
 }
 
 /** Per-call options accepted by every public HTTP method. */
+/** Pagination for {@link StatewaveClient.getTimeline}. */
+export interface TimelineParams {
+  /** Rows per collection to return. */
+  limit?: number;
+  /** Rows to skip within the chosen ordering. */
+  offset?: number;
+  /**
+   * Page from the newest end of the timeline instead of the oldest.
+   *
+   * Rows are still returned in ascending chronological order within the page;
+   * this chooses *which* rows, not how they are sorted.
+   */
+  newestFirst?: boolean;
+}
+
 export interface RequestOptions {
   /**
    * An `AbortSignal` for cancelling the request. When the signal fires,
@@ -588,15 +603,51 @@ export class StatewaveClient {
   /**
    * Fetch the chronological episode + memory timeline for a subject.
    *
+   * Without `params` the server returns its own default page — the OLDEST
+   * episodes for the subject. A consumer that wants a bounded window of
+   * *recent* history must ask for it with `newestFirst`, or it will page
+   * through a subject's entire lifetime to reach the end.
+   *
+   * `params` requires a server that accepts them; older instances ignore
+   * unknown query parameters and return their default page. Check
+   * `episodesHasMore` / `memoriesHasMore` rather than inferring completeness
+   * from the page being shorter than `limit`.
+   *
    * @param subjectId - The subject to fetch.
+   * @param params - Optional `limit`, `offset`, and `newestFirst`.
    * @param options - Optional per-call options including `signal`.
    * @returns The {@link Timeline}.
    * @throws {StatewaveAPIError} On a non-2xx response.
    * @example
-   * const timeline = await sw.getTimeline("user:42");
+   * // The 20 most recent episodes, oldest-to-newest within the page.
+   * const timeline = await sw.getTimeline("user:42", { limit: 20, newestFirst: true });
    */
-  async getTimeline(subjectId: string, options?: RequestOptions): Promise<Timeline> {
-    return this.get(`/v1/timeline?subject_id=${encodeURIComponent(subjectId)}`, options?.signal);
+  async getTimeline(subjectId: string, options?: RequestOptions): Promise<Timeline>;
+  async getTimeline(
+    subjectId: string,
+    params?: TimelineParams,
+    options?: RequestOptions,
+  ): Promise<Timeline>;
+  async getTimeline(
+    subjectId: string,
+    paramsOrOptions?: TimelineParams | RequestOptions,
+    maybeOptions?: RequestOptions,
+  ): Promise<Timeline> {
+    // `getTimeline(id, { signal })` was the whole signature before `params`
+    // existed. Sliding a new argument into second place would leave those
+    // calls compiling and silently un-cancellable, so the older shape is
+    // still accepted: a second argument carrying `signal` is options.
+    const secondIsOptions =
+      paramsOrOptions !== undefined && "signal" in paramsOrOptions && maybeOptions === undefined;
+    const params = (secondIsOptions ? undefined : paramsOrOptions) as TimelineParams | undefined;
+    const options = secondIsOptions ? (paramsOrOptions as RequestOptions) : maybeOptions;
+
+    const qs = new URLSearchParams();
+    qs.set("subject_id", subjectId);
+    if (params?.limit !== undefined) qs.set("limit", String(params.limit));
+    if (params?.offset !== undefined) qs.set("offset", String(params.offset));
+    if (params?.newestFirst !== undefined) qs.set("newest_first", String(params.newestFirst));
+    return this.get(`/v1/timeline?${qs}`, options?.signal);
   }
 
   /**
