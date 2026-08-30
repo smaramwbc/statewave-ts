@@ -1,5 +1,40 @@
 # Changelog
 
+## Unreleased
+
+### Added — `getTimeline` can page, and can page from the recent end
+
+`getTimeline` previously sent `subject_id` and nothing else, so a caller got the
+server's default page and had no way to change it. On a subject with more
+episodes than that page holds, the rows returned are the **oldest** ones — the
+opposite of what a consumer keeping a "recent activity" window wants, and it
+gets worse the longer the subject lives.
+
+- `getTimeline(subjectId, params?, options?)` accepts `limit`, `offset`, and
+  `newestFirst` (exported as `TimelineParams`).
+- `Timeline` declares `episodesHasMore` / `memoriesHasMore`. Both are optional:
+  an instance that does not send them leaves them `undefined`, which is not the
+  same as `false`. Do not read a missing flag as "the page is complete".
+- The query string is now built with `URLSearchParams`, matching
+  `listSubjects`, which is how the extra parameters are appended. Encoding of
+  the subject id is unchanged — the previous `encodeURIComponent` already
+  escaped `&` and `=` — and a test pins that a subject id containing them
+  still round-trips.
+
+Requires a server that accepts these parameters —
+[statewave#362](https://github.com/smaramwbc/statewave/pull/362) for
+`limit`/`offset` and the has-more flags, and
+[statewave#363](https://github.com/smaramwbc/statewave/pull/363) for
+`newest_first`. An older instance ignores unknown query parameters and returns
+its default page, which is why the has-more flags are typed optional rather
+than assumed.
+
+**Backward compatible.** `params` slots in ahead of `options`, matching
+`listSubjects`, but the older `getTimeline(id, { signal })` shape still works:
+a second argument carrying `signal` is read as options, so those calls stay
+cancellable rather than silently passing an ignored params bag. Both shapes are
+covered by tests.
+
 ## 1.4.0 (2026-07-14)
 
 Parity release with `statewave` server v1.4.0 — no SDK behavior changes since v1.2.0.

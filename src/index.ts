@@ -4,5 +4,5 @@ export {
   StatewaveConnectionError,
   StatewaveUnreplayableError,
 } from "./client.js";
-export type { RequestOptions } from "./client.js";
+export type { RequestOptions, TimelineParams } from "./client.js";
 export type * from "./types.js";
