@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.5.0 (2026-08-30)
 
 ### Added — `getTimeline` can page, and can page from the recent end
 
