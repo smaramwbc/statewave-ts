@@ -6,7 +6,7 @@
 
 Official TypeScript SDK for [Statewave](https://github.com/smaramwbc/statewave) — memory runtime for AI agents and applications.
 
-Current release: **v1.4.0** — the typed surface matches the `/v1` REST contract and is semver-stable from 1.0.0 forward.
+Current release: **v1.5.0** — the typed surface matches the `/v1` REST contract and is semver-stable from 1.0.0 forward.
 
 > **Part of [Statewave](https://github.com/smaramwbc/statewave)** — the open-source memory runtime for AI agents.
 >
