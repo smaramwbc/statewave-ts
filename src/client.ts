@@ -160,6 +160,12 @@ export interface TimelineParams {
    * this chooses *which* rows, not how they are sorted.
    */
   newestFirst?: boolean;
+  /**
+   * Memory rows to include: `"all"` (default — superseded and expired rows
+   * are returned) or `"active"` (only currently authoritative rows; server
+   * v1.5.0+). Episodes are never filtered.
+   */
+  status?: "all" | "active";
 }
 
 export interface RequestOptions {
@@ -614,7 +620,7 @@ export class StatewaveClient {
    * from the page being shorter than `limit`.
    *
    * @param subjectId - The subject to fetch.
-   * @param params - Optional `limit`, `offset`, and `newestFirst`.
+   * @param params - Optional `limit`, `offset`, `newestFirst`, and `status`.
    * @param options - Optional per-call options including `signal`.
    * @returns The {@link Timeline}.
    * @throws {StatewaveAPIError} On a non-2xx response.
@@ -647,6 +653,7 @@ export class StatewaveClient {
     if (params?.limit !== undefined) qs.set("limit", String(params.limit));
     if (params?.offset !== undefined) qs.set("offset", String(params.offset));
     if (params?.newestFirst !== undefined) qs.set("newest_first", String(params.newestFirst));
+    if (params?.status !== undefined) qs.set("status", params.status);
     return this.get(`/v1/timeline?${qs}`, options?.signal);
   }
 
